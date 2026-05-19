@@ -1,14 +1,15 @@
-%------ Paths -------------------------------------------------------------
-addpath('data')
-%--------------------------------------------------------------------------
-% Format Long
+% Final Project - Group 1b
+% Achille Galante, Salvatore Ippolito, Ginevra Angelica Marelli
+clc
+clear all
+rng(1234);
 format long g
+addpath('data')
 
+%%
 % Ref Date and Curve
 refDate = datetime(2023, 1, 31);
-
-dataFolder = 'C:\Users\user\Desktop\Final_Project_FE';
-curveFile  = fullfile(dataFolder, '20220626_Curve.xlsx');  % just the .xlsx, no sheet name
+curveFile  = fullfile('data', '20220626_Curve.xlsx');  % just the .xlsx, no sheet name
 
 OIS_Curve   = importMarketData(curveFile, 'OIS ESTR Curve');
 EUR3M_Curve = importMarketData(curveFile, '3MCurve');
