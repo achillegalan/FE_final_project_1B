@@ -1,4 +1,5 @@
 function t_dates = convertTermToDays(termStrings, settlementDate)
+    
 % CONVERTTERMSTODAYS Converts term strings to actual dates using Modified Following.
 %
 % INPUTS:

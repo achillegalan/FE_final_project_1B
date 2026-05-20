@@ -19,13 +19,13 @@ function adjDate = modifiedFollowing(dt)
 
 % Adjust to next business day; if it crosses month-end, go back instead.
     adjDate = dt;
-    while isWeekend(adjDate)
+    while ~is_target_business_day(adjDate)
         adjDate = adjDate + caldays(1);
     end
     % If we crossed into a new month, roll backward instead
     if month(adjDate) ~= month(dt)
         adjDate = dt;
-        while isWeekend(adjDate)
+        while ~is_target_business_day(adjDate)
             adjDate = adjDate - caldays(1);
         end
     end

@@ -12,9 +12,7 @@ addpath('utilities')
 %%
 % Ref Date and Curve
 refDate = datetime(2023, 1, 31);
-%COMMENT: needed to compute the settlementdate = refdate + 2 in a
-%consistent way, now just to test function
-settlementDate = refDate + days(2);
+settlementDate = add_target_business_days(refDate, 2);
 
 curveFile  = fullfile('data', '20230131_Curve.xlsx');  % just the .xlsx, no sheet name
 
@@ -35,6 +33,6 @@ figure;
 plot(t_dates, OIS_Curve.Discount, 'r-*', 'DisplayName', 'Vendor Discount');
 hold on;
 plot(t_dates, P_D_calculated, 'b-*', 'DisplayName', 'My Bootstrap');
-xlabel('Days to Maturity'); ylabel('Discount Factor');
+xlabel('Maturity Date'); ylabel('Discount Factor');
 legend; title('Bootstrap Verification');
 

@@ -30,40 +30,39 @@ OIS_df_dates = OIS_rates_dates;
 yearfracs = yearfrac(settlementdate, OIS_rates_dates, 2);
 
 %///BOOTSTRAP ALGO
-k = 0;
 for i = 1:n_knots
     
     if yearfracs(i) <= 1.0
         OIS_df(i) = 1 / (1 + yearfracs(i) * OIS_rates(i));
-        k = k + 1;
 
     else
         % Find how many strictly annual payments have occurred
-        num_annual_payments = floor(yearfracs(i));
-        BPV = 0;
-        prev_annual_date = settlementdate;
-        
-        for a = 1:num_annual_payments-1
-                annual_date = settlementdate + calyears(a);
-                
-                %///lin_interp on zero rates ==> derive df
-                known_t = yearfracs(1:i-1);
-                known_r = -log(OIS_df(1:i-1)) ./ known_t;
-                target_t = yearfrac(settlementdate, annual_date, 2);
-                interp_r = interp1(known_t, known_r, target_t, 'linear', 'extrap');
-                df_annual = exp(-interp_r * target_t);
+        pay_dates = OIS_rates_dates(i);
+        probe_date = OIS_rates_dates(i);
 
-                % year fraction for this specific annual period
-                delta_k = yearfrac(prev_annual_date, annual_date, 2);
-                BPV = BPV + (delta_k * df_annual);
-                
-                prev_annual_date = annual_date;
+        while (probe_date - calyears(1)) > settlementdate
+            probe_date = modifiedFollowing(probe_date - calyears(1));
+            pay_dates = [probe_date; pay_dates]; 
         end
-            delta_i = yearfrac(prev_annual_date, OIS_rates_dates(i), 2);
 
-        numerator = 1 - (OIS_rates(i) * BPV);
-        denominator = 1 + (delta_i * OIS_rates(i));
-        OIS_df(i) = numerator/denominator;
+        pay_dates = [settlementdate; pay_dates];
+        
+        BPV = 0;
+        for p = 2:(numel(pay_dates)-1)
+            pay_date = pay_dates(p);
+
+            known_t = yearfracs(1:i-1);
+            known_r = -log(OIS_df(1:i-1)) ./ known_t;
+            target_t = yearfrac(settlementdate, pay_date, 2);
+            interp_r = interp1(known_t, known_r, target_t, 'linear', 'extrap');
+            df_pay = exp(-interp_r * target_t);
+
+            delta_k = yearfrac(pay_dates(p-1), pay_date, 2);
+            BPV = BPV + delta_k * df_pay;
+        end
+
+        delta_i = yearfrac(pay_dates(end-1), pay_dates(end), 2);
+        OIS_df(i) = (1 - OIS_rates(i) * BPV) / (1 + OIS_rates(i) * delta_i);
     end
 end
 
