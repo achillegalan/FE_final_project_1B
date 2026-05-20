@@ -14,8 +14,8 @@ dataTable = readtable(filename, 'Sheet', sheetName, 'VariableNamingRule', 'prese
 dataTable = dataTable(:, {'Term', 'Market Rate', 'Zero Rate', 'Discount'});
 
 curveData.Term       = dataTable.Term;
-curveData.MarketRate = dataTable.("Market Rate");
-curveData.ZeroRate   = dataTable.("Zero Rate");
+curveData.MarketRate = dataTable.("Market Rate")/100; % percentage => decimal
+curveData.ZeroRate   = dataTable.("Zero Rate")/100; % percentage => decimal
 curveData.Discount   = dataTable.Discount;
 
 %///Warn if any NaNs were imported
