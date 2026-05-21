@@ -17,16 +17,25 @@ function adjDate = modifiedFollowing(dt)
 %         institutional accuracy, it should be expanded to accept and check 
 %         against a holiday calendar (e.g., TARGET2 bank holidays).
 
-% Adjust to next business day; if it crosses month-end, go back instead.
+% Supports scalar or array datetime inputs.
     adjDate = dt;
-    while ~is_target_business_day(adjDate)
-        adjDate = adjDate + caldays(1);
-    end
-    % If we crossed into a new month, roll backward instead
-    if month(adjDate) ~= month(dt)
-        adjDate = dt;
-        while ~is_target_business_day(adjDate)
-            adjDate = adjDate - caldays(1);
+
+    for i = 1:numel(dt)
+        d = dt(i);
+
+        % Adjust to next business day.
+        while ~is_target_business_day(d)
+            d = d + caldays(1);
         end
+
+        % If we crossed into a new month, roll backward instead.
+        if month(d) ~= month(dt(i))
+            d = dt(i);
+            while ~is_target_business_day(d)
+                d = d - caldays(1);
+            end
+        end
+
+        adjDate(i) = d;
     end
 end
