@@ -1,4 +1,4 @@
-function adjDate = modifiedFollowing(dt)
+function adjustedPaymentDates = modifiedFollowing(unadjustedPaymentDates)
 % MODIFIEDFOLLOWING Adjusts a date using the Modified Following convention.
 %
 %   Advances the input date to the next available business day. However, 
@@ -7,7 +7,7 @@ function adjDate = modifiedFollowing(dt)
 %   is the strict standard in Euro money markets for FRAs and Swaps.
 %
 %   INPUTS:
-%       dt      - Datetime object representing the unadjusted target date.
+%       unadjustedPaymentDates - Datetime object representing the unadjusted target date.
 %
 %   OUTPUTS:
 %       adjDate - Datetime object adjusted to a valid business day.
@@ -17,16 +17,30 @@ function adjDate = modifiedFollowing(dt)
 %         institutional accuracy, it should be expanded to accept and check 
 %         against a holiday calendar (e.g., TARGET2 bank holidays).
 
-% Adjust to next business day; if it crosses month-end, go back instead.
-    adjDate = dt;
+adjustedPaymentDates = unadjustedPaymentDates;
+
+adjustedPaymentDates = unadjustedPaymentDates;
+
+% Loop through each date individually
+for i = 1:length(unadjustedPaymentDates)
+    dt = unadjustedPaymentDates(i);
+    
+    adjDate = dt; 
+    
+    % Roll forward 
     while ~is_target_business_day(adjDate)
         adjDate = adjDate + caldays(1);
     end
-    % If we crossed into a new month, roll backward instead
+    
+    % Check if we crossed a month boundary
     if month(adjDate) ~= month(dt)
-        adjDate = dt;
+        adjDate = dt; % Reset back to original date
+        
+        % Roll backward instead
         while ~is_target_business_day(adjDate)
             adjDate = adjDate - caldays(1);
         end
     end
+    
+    adjustedPaymentDates(i) = adjDate;
 end
