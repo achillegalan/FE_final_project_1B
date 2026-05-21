@@ -17,22 +17,22 @@ curveFile  = fullfile('data', '20220626_Curve.xlsx');
 curveColumns  = {'Term', 'Market Rate', 'Zero Rate', 'Discount'};
 curveScaling  = [1, 1/100, 1/100, 1];   % rates: % -> decimal
 
-OIS_Curve = importExcellData(curveFile, 'OIS ESTR Curve', curveColumns, curveScaling);
-EUR3M_Curve = importExcellData(curveFile, '3MCurve', curveColumns, curveScaling);
+OIS_Curve  = importSheetData(curveFile, 'OIS ESTR Curve', curveColumns, curveScaling);
+EUR3M_Curve = importSheetData(curveFile, '3MCurve', curveColumns, curveScaling);
 
 % 2023
 refDate_2 = datetime(2023, 1, 31);
 settlementDate_2 = add_target_business_days(refDate_2, 2);
 curveFile_2  = fullfile('data', '20230131_Curve.xlsx');  
+
+curveFile_2      = fullfile('data', '20230131_Curve.xlsx');
+
 curveColumns  = {'Term', 'Market Rate', 'Zero Rate', 'Discount'};
 curveScaling  = [1, 1/100, 1/100, 1];
 
-OIS_Curve_2   = importExcellData(curveFile_2, 'Curva OIS 31 Jan', curveColumns, curveScaling);
-EUR3M_Curve_2 = importExcellData(curveFile_2, 'Curve 3M 31 Jan',  curveColumns, curveScaling);
+OIS_Curve_2   = importSheetData(curveFile_2, 'Curva OIS 31 Jan', curveColumns, curveScaling);
+EUR3M_Curve_2 = importSheetData(curveFile_2, 'Curve 3M 31 Jan',  curveColumns, curveScaling);
 
-% Swap Amortizing
-swapData = importExcellData('SwapAmortizingPlan_v1.xlsx', 'SwapPlan', ...
-    {'Pay Date', 'Accrual Start', 'Accrual End', 'Days', 'Notional'});
 
 %% prova boostrap ois 2022
 t_dates = convertTermToDays(OIS_Curve.Term, settlementDate);
@@ -46,8 +46,7 @@ plot(t_dates, P_D_calculated, 'b-*', 'DisplayName', 'My Bootstrap');
 xlabel('Maturity Date'); ylabel('Discount Factor');
 legend; title('Bootstrap Verification');
 
-grid on; 
-grid minor;
+
 %% prova boostrap ois 2023
 t_dates = convertTermToDays(OIS_Curve_2.Term, settlementDate_2);
 
@@ -60,5 +59,3 @@ plot(t_dates, P_D_calculated, 'b-*', 'DisplayName', 'My Bootstrap');
 xlabel('Maturity Date'); ylabel('Discount Factor');
 legend; title('Bootstrap Verification');
 
-grid on; 
-grid minor;
