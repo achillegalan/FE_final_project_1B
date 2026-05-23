@@ -1,11 +1,15 @@
 function d_out = add_target_business_days(d_in, n)
-% add_target_business_days  Add/subtract TARGET business days.
+
+%ADD_TARGET_BUSINESS_DAYS Adds or subtracts TARGET business days from a date.
 %
-% d_out = add_target_business_days(d_in, n)
+% INPUTS:
+%   d_in    Initial date, as datetime or serial date number.
+%   n       Number of TARGET business days to move. Positive values move
+%           forward, negative values move backward, and zero returns d_in.
 %
-% If n > 0, moves forward by n TARGET business days.
-% If n < 0, moves backward by abs(n) TARGET business days.
-% If n = 0, returns the input date.
+% OUTPUT:
+%   d_out   Date obtained by moving n TARGET business days from d_in,
+%           skipping weekends and TARGET holidays.
 
 if n == 0
     d_out = d_in;

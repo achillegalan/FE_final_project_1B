@@ -1,11 +1,19 @@
 function interp_discount = get_discount_factor_by_zero_rates_linear_interp( ...
     reference_date, interp_date, dates, discount_factors)
-%GET_DISCOUNT_FACTOR_BY_ZERO_RATES_LINEAR_INTERP Interpolate discount by zero rates.
+
+%GET_DISCOUNT_FACTOR_BY_ZERO_RATES_LINEAR_INTERP Interpolates a discount factor using linear interpolation on zero rates.
 %
-% The function:
-%   1) computes continuous zero rates from discount factors
-%   2) linearly interpolates zero rates in ACT/365 time
-%   3) converts back to discount at interp_date
+% INPUTS:
+%   reference_date      Curve reference date.
+%   interp_date         Date at which the discount factor is required.
+%   dates               Curve node dates.
+%   discount_factors    Discount factors corresponding to dates.
+%
+% OUTPUT:
+%   interp_discount     Discount factor at interp_date, obtained by converting
+%                       discounts into continuous ACT/365 zero rates, linearly
+%                       interpolating the zero rate, and converting it back into
+%                       a discount factor.
 
     dates = dates(:);
     discount_factors = discount_factors(:);

@@ -11,11 +11,6 @@ function adjDate = modifiedFollowing(dt)
 %
 %   OUTPUTS:
 %       adjDate - Datetime object adjusted to a valid business day.
-%
-%   NOTES:
-%       - This baseline implementation only accounts for weekends. For full 
-%         institutional accuracy, it should be expanded to accept and check 
-%         against a holiday calendar (e.g., TARGET2 bank holidays).
 
 % Supports scalar or array datetime inputs.
     adjDate = dt;

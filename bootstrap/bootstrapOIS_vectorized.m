@@ -1,56 +1,39 @@
-function varargout = bootstrapOIS_vectorized(settlementDate, OIS_input, varargin)
-%DISCOUNTINGBOOTSTRAPOIS Bootstrap OIS curve and return a curve struct.
-% (Updated: Strict struct input & fully vectorized BPV/Schedule logic)
+function OIS_Boot = bootstrapOIS_vectorized(settlementDate, OIS_input)
 
-% === 1. STRICT STRUCT INPUT VALIDATION ===
-if ~isstruct(OIS_input)
-    error('discountingBootstrapOIS:invalidInput', ...
-        'Input must be a struct. Legacy array syntax is no longer supported.');
-end
-if ~isfield(OIS_input, 'MarketRate') || ~isfield(OIS_input, 'Term')
-    error('discountingBootstrapOIS:missingField', ...
-        'OIS_input struct must contain "Term" and "MarketRate" fields.');
-end
+%BOOTSTRAPOIS_VECTORIZED Bootstraps the OIS discounting curve.
+%
+% INPUTS:
+%   settlementDate   Curve settlement date.
+%   OIS_input        Struct/table containing OIS market data, with fields:
+%                    - Term: OIS maturities.
+%                    - MarketRate: corresponding OIS market rates.
+%
+% OUTPUT:
+%   OIS_Boot         Struct containing:
+%                    - settlementDate: curve settlement date.
+%                    - dates: OIS bootstrap node dates.
+%                    - discounts: OIS discount factors on bootstrap nodes.
+%                    - zeroRates: continuous ACT/365 zero rates computed from discounts.
+%                    - marketRates: sorted OIS market rates used in the bootstrap.
 
+% Sorting and Initialization
 OIS_rates = OIS_input.MarketRate(:);
+OIS_rates_dates = convertTermToDays(OIS_input.Term, settlementDate);
 
-% Handle optional term-to-days conversion arguments
-if isempty(varargin)
-    OIS_rates_dates = convertTermToDays(OIS_input.Term, settlementDate);
-elseif isdatetime(varargin{1})
-    OIS_rates_dates = varargin{1}(:);
-    if numel(varargin) > 1
-        error('discountingBootstrapOIS:invalidInputs', ...
-            'If explicit dates are provided, no additional arguments are allowed.');
-    end
-else
-    OIS_rates_dates = convertTermToDays(OIS_input.Term, settlementDate, varargin{:});
-end
-
-if numel(OIS_rates) ~= numel(OIS_rates_dates)
-    error('discountingBootstrapOIS:sizeMismatch', ...
-        'OIS_rates and OIS_rates_dates must have the same number of elements.');
-end
-if any(isnat(OIS_rates_dates))
-    error('discountingBootstrapOIS:invalidDates', ...
-        'OIS_rates_dates contains NaT values. Check term parsing and input terms.');
-end
-
-% === SORTING AND INITIALIZATION ===
 [OIS_df_dates, sortIdx] = sort(OIS_rates_dates);
 sortedRates = OIS_rates(sortIdx);
 n_knots = numel(sortedRates);
 OIS_df = zeros(n_knots, 1);
 yearfracs = yearfrac(settlementDate, OIS_df_dates, 2); % Act/360
 
-% === BOOTSTRAPPING (Sequential outer loop, Vectorized inner loops) ===
+% BOOTSTRAPPING (Sequential outer loop, Vectorized inner loops)
 for i = 1:n_knots
     % Short-end nodes (<= 1Y)
     if yearfracs(i) <= 1.0
         OIS_df(i) = 1 / (1 + yearfracs(i) * sortedRates(i));
         continue
     end
-    
+
     if i == 1
         error('discountingBootstrapOIS:invalidFirstNode', ...
             'First maturity is beyond 1Y. Add short-end OIS instruments before swaps.');
@@ -100,7 +83,7 @@ end
 assert(all(OIS_df > 0), 'FinEng:BootstrapError', ...
     'Negative discount factor calculated. Check input rates.');
 
-% === OUTPUT YIELDS ===
+% Outputs
 % Continuous zero rates on Act/365
 tau_ois = yearfrac(settlementDate, OIS_df_dates, 3);
 zeroRates_ois = nan(size(OIS_df));
@@ -114,18 +97,4 @@ OIS_Boot.discounts = OIS_df;
 OIS_Boot.zeroRates = zeroRates_ois;
 OIS_Boot.marketRates = sortedRates;
 
-% Output policy
-if nargout <= 1
-    varargout{1} = OIS_Boot;
-elseif nargout == 2
-    varargout{1} = OIS_df;
-    varargout{2} = OIS_df_dates;
-elseif nargout == 3
-    varargout{1} = OIS_df;
-    varargout{2} = OIS_df_dates;
-    varargout{3} = zeroRates_ois;
-else
-    error('discountingBootstrapOIS:tooManyOutputs', ...
-        'Supported outputs are 1 (struct), 2 (discounts, dates), or 3 (discounts, dates, zeroRates).');
-end
 end

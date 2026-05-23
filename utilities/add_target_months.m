@@ -14,10 +14,6 @@ function adjustedDate = add_target_months(inputDate, nMonths, convention)
         convention = 'modifiedfollow';
     end
 
-    if ~(strcmpi(convention, 'modifiedfollow') || strcmpi(convention, 'modifiedfollowing'))
-        error('add_target_months currently supports only Modified Following convention.');
-    end
-
     rawDate = inputDate + calmonths(nMonths);
     adjustedDate = modifiedFollowing(rawDate);
 end

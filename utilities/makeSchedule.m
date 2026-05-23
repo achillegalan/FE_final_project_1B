@@ -15,11 +15,7 @@ function dates = makeSchedule(startDate, endDate, stepMonths, convention)
     if nargin < 4 || isempty(convention)
         convention = 'modifiedfollow';
     end
-
-    if ~(strcmpi(convention, 'modifiedfollow') || strcmpi(convention, 'modifiedfollowing'))
-        error('makeSchedule currently supports only Modified Following convention.');
-    end
-
+    
     dates = startDate;
     k = 1;
     while true

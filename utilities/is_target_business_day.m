@@ -1,5 +1,14 @@
 function tf = is_target_business_day(dates)
-% is_target_business_day  True for TARGET business days.
+
+%IS_TARGET_BUSINESS_DAY Checks whether dates are TARGET business days.
+%
+% INPUT:
+%   dates   Datetime array or serial date numbers to check.
+%
+% OUTPUT:
+%   tf      Logical array with the same size as dates. Each element is true
+%           if the corresponding date is not a weekend and not a TARGET
+%           holiday; false otherwise.
 
 tf = true(size(dates));
 if isempty(dates)

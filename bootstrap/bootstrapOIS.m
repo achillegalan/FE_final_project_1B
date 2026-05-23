@@ -1,4 +1,4 @@
-function varargout = bootstrapOIS(settlementDate, OIS_input, varargin)
+function OIS_Boot = bootstrapOIS(settlementDate, OIS_input)
 %DISCOUNTINGBOOTSTRAPOIS Bootstrap OIS curve and return a curve struct.
 %
 % Constructs a discount curve by iteratively solving OIS discount factors.
@@ -8,82 +8,21 @@ function varargout = bootstrapOIS(settlementDate, OIS_input, varargin)
 % INPUTS:
 %   settlementDate - Spot settlement date (datetime)
 %
-%   Preferred syntax:
-%   discountingBootstrapOIS(settlementDate, OIS_Curve, ...)
+%   Syntax:
+%   bootstrapOIS(settlementDate, OIS_Curve)
 %     OIS_Curve must contain:
 %       - Term
 %       - MarketRate
-%     Optional trailing args are forwarded to convertTermToDays, e.g.:
-%       'FuturesDate','expiry','OnUnknownTerm','warning'
 %
-%   Legacy syntax:
-%   discountingBootstrapOIS(settlementDate, OIS_rates, OIS_rates_dates)
-%
-% OUTPUTS (recommended):
-%   OIS_Boot struct with fields:
+% OUTPUTS:   OIS_Boot struct with fields:
 %     - settlementDate
 %     - dates
 %     - discounts
 %     - zeroRates
 %     - marketRates
-%
-% NOTES:
-%   - Bootstrap uses Actual/360.
-%   - Zero rates are computed with Actual/365 (continuous compounding).
 
-% Resolve input syntax
-if isstruct(OIS_input)
-    if ~isfield(OIS_input, 'MarketRate')
-        error('discountingBootstrapOIS:missingField', ...
-            'When OIS_input is a struct, field "MarketRate" is required.');
-    end
-    if ~isfield(OIS_input, 'Term')
-        error('discountingBootstrapOIS:missingField', ...
-            'When OIS_input is a struct, field "Term" is required.');
-    end
-
-    OIS_rates = OIS_input.MarketRate(:);
-    if isempty(varargin)
-        OIS_rates_dates = convertTermToDays(OIS_input.Term, settlementDate);
-    elseif isdatetime(varargin{1})
-        OIS_rates_dates = varargin{1}(:);
-        if numel(varargin) > 1
-            error('discountingBootstrapOIS:invalidInputs', ...
-                'If explicit dates are provided, no additional arguments are allowed.');
-        end
-    else
-        OIS_rates_dates = convertTermToDays(OIS_input.Term, settlementDate, varargin{:});
-    end
-else
-    if isempty(varargin)
-        error('discountingBootstrapOIS:missingDates', ...
-            'Legacy syntax requires OIS_rates_dates as third argument.');
-    end
-    OIS_rates = OIS_input(:);
-    OIS_rates_dates = varargin{1};
-    if ~isdatetime(OIS_rates_dates)
-        error('discountingBootstrapOIS:invalidDates', ...
-            'OIS_rates_dates must be a datetime array.');
-    end
-    OIS_rates_dates = OIS_rates_dates(:);
-    if numel(varargin) > 1
-        error('discountingBootstrapOIS:invalidInputs', ...
-            'Legacy syntax accepts only 3 inputs: settlementDate, OIS_rates, OIS_rates_dates.');
-    end
-end
-
-if numel(OIS_rates) ~= numel(OIS_rates_dates)
-    error('discountingBootstrapOIS:sizeMismatch', ...
-        'OIS_rates and OIS_rates_dates must have the same number of elements.');
-end
-if isempty(OIS_rates)
-    error('discountingBootstrapOIS:emptyInput', ...
-        'OIS_rates and OIS_rates_dates cannot be empty.');
-end
-if any(isnat(OIS_rates_dates))
-    error('discountingBootstrapOIS:invalidDates', ...
-        'OIS_rates_dates contains NaT values. Check term parsing and input terms.');
-end
+OIS_rates = OIS_input.MarketRate(:);
+OIS_rates_dates = convertTermToDays(OIS_input.Term, settlementDate);
 
 % Sort maturities and keep rates aligned
 [OIS_df_dates, sortIdx] = sort(OIS_rates_dates);
@@ -151,18 +90,4 @@ OIS_Boot.discounts = OIS_df;
 OIS_Boot.zeroRates = zeroRates_ois;
 OIS_Boot.marketRates = sortedRates;
 
-% Output policy
-if nargout <= 1
-    varargout{1} = OIS_Boot;
-elseif nargout == 2
-    varargout{1} = OIS_df;
-    varargout{2} = OIS_df_dates;
-elseif nargout == 3
-    varargout{1} = OIS_df;
-    varargout{2} = OIS_df_dates;
-    varargout{3} = zeroRates_ois;
-else
-    error('discountingBootstrapOIS:tooManyOutputs', ...
-        'Supported outputs are 1 (struct), 2 (discounts, dates), or 3 (discounts, dates, zeroRates).');
-end
 end

@@ -11,10 +11,6 @@ function [startDate, endDate] = future3mDates(code, settlementDate)
 %   endDate   - Datetime object corresponding to the IMM end date, three months
 %               after startDate.
 
-    if nargin < 2 || isempty(settlementDate)
-        error('future3mDates requires settlementDate for 1-digit year codes.');
-    end
-
     code = upper(strtrim(char(string(code))));
     tk = regexp(code, '^ER([FGHJKMNQUVXZ])(\d{1,2})$', 'tokens', 'once');
     if isempty(tk)
