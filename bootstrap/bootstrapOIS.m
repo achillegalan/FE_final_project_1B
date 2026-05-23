@@ -1,4 +1,4 @@
-function varargout = discountingBootstrapOIS(settlementDate, OIS_input, varargin)
+function varargout = bootstrapOIS(settlementDate, OIS_input, varargin)
 %DISCOUNTINGBOOTSTRAPOIS Bootstrap OIS curve and return a curve struct.
 %
 % Constructs a discount curve by iteratively solving OIS discount factors.
@@ -112,7 +112,7 @@ for i = 1:n_knots
 
     while (probe_date - calyears(1)) > settlementDate
         probe_date = modifiedFollowing(probe_date - calyears(1));
-        pay_dates = [probe_date; pay_dates]; %#ok<AGROW>
+        pay_dates = [probe_date; pay_dates]; 
     end
 
     pay_dates = [settlementDate; pay_dates];
