@@ -33,38 +33,33 @@ EUR3M_Curve_2 = importExcellData(curveFile_2, 'Curve 3M 31 Jan',  curveColumns);
 swapData = importExcellData('SwapAmortizingPlan_v1.xlsx', 'SwapPlan', ...
     {'Pay Date', 'Accrual Start', 'Accrual End', 'Days', 'Notional'});
 
-%% prova boostrap ois 2022
-t_dates = convertTermtoDaysGeneralized(OIS_Curve.Term, settlementDate);
+%% 2022 curves
+OIS_Boot = discountingBootstrapOIS(settlementDate, OIS_Curve);
+EUR3M_Boot = bootstrapCrab3M(EUR3M_Curve, OIS_Boot, settlementDate, true);
+% disp('=== EUR3M CRAB - NODI BOOTSTRAP ===')
+% disp(EUR3M_Boot.nodesTable)
+% disp('=== EUR3M CRAB - TUTTE LE DATE CALCOLATE ===')
+% disp(EUR3M_Boot.table)
 
-P_D_calculated = discountingBootstrapOIS(settlementDate, OIS_Curve.MarketRate, t_dates);
-yearfracs_curve = yearfrac(settlementDate, t_dates, 2);
-P_D_market = 1 ./ (1 + yearfracs_curve .* OIS_Curve.MarketRate);
+%% 2023 curves
+OIS_Boot_2 = discountingBootstrapOIS(settlementDate_2, OIS_Curve_2);
+EUR3M_Boot_2 = bootstrapCrab3M(EUR3M_Curve_2, OIS_Boot_2, settlementDate_2, true);
 
-figure;
-plot(t_dates, P_D_market, ['r-o'], 'DisplayName', 'Discount from Market Rate');
-hold on;
-plot(t_dates, P_D_calculated, 'b-*', 'DisplayName', 'My Bootstrap');
-xlabel('Maturity Date'); ylabel('Discount Factor');
-legend; title('Bootstrap Verification');
 
-grid on; 
-grid minor;
-%% prova boostrap ois 2023
-t_dates = convertTermToDays(OIS_Curve_2.Term, settlementDate_2);
-
-P_D_calculated = discountingBootstrapOIS(settlementDate_2, OIS_Curve_2.MarketRate, t_dates);
-yearfracs_curve_2 = yearfrac(settlementDate_2, t_dates, 2);
-P_D_market_2 = 1 ./ (1 + yearfracs_curve_2 .* OIS_Curve_2.MarketRate);
+%% Plot: OIS discount curve 2022 vs 2023 (MA ANCHE DA TOGLIERE)
+tau22 = yearfrac(settlementDate, OIS_Boot.dates, 3);
+tau23 = yearfrac(settlementDate_2, OIS_Boot_2.dates, 3);
 
 figure;
-plot(t_dates, P_D_market_2, 'r-o', 'DisplayName', 'Discount from Market Rate');
+plot(tau22, OIS_Boot.discounts, '-o', 'LineWidth', 1.3, 'DisplayName', 'OIS 2022');
 hold on;
-plot(t_dates, P_D_calculated, 'b-*', 'DisplayName', 'My Bootstrap');
-xlabel('Maturity Date'); ylabel('Discount Factor');
-legend; title('Bootstrap Verification');
+plot(tau23, OIS_Boot_2.discounts, '-s', 'LineWidth', 1.3, 'DisplayName', 'OIS 2023');
+grid on;
+xlabel('Maturity (years)');
+ylabel('Discount Factor');
+title('OIS Discount Curves: 2022 vs 2023');
+legend('Location','best');
 
-grid on; 
-grid minor;
 
 %% task 2: NPV_riskfree Ammortized Swap
 
@@ -79,11 +74,11 @@ monthIncrements = calmonths(3 * (1:totalPeriods)');
 payments_dates = settlementDate + monthIncrements;
 payments_dates_adjusted = modifiedFollowing(payments_dates);
 
-curveDates = convertTermtoDaysGeneralized(OIS_Curve.Term, settlementDate);
-pseudocurveDates = convertTermtoDaysGeneralized(EUR3M_Curve.Term, settlementDate);
+curveDates = OIS_Boot.dates;
+pseudocurveDates = EUR3M_Boot.dates;
 
 %%
 swap = AmmortizedSwapPricer(payments_dates_adjusted, curveDates, pseudocurveDates, ...
-    swapData.Notional, OIS_Curve.ZeroRate, EUR3M_Curve.ZeroRate, fixedRate, ...
+    swapData.Notional, OIS_Boot.zeroRates, EUR3M_Boot.zeroRates, fixedRate, ...
     settlementDate);
 disp(swap)
