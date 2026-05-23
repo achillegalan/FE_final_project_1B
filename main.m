@@ -34,7 +34,7 @@ swapData = importExcellData('SwapAmortizingPlan_v1.xlsx', 'SwapPlan', ...
     {'Pay Date', 'Accrual Start', 'Accrual End', 'Days', 'Notional'});
 
 %% 2022 curves
-OIS_Boot = discountingBootstrapOIS(settlementDate, OIS_Curve);
+OIS_Boot = bootstrapOIS_vectorized(settlementDate, OIS_Curve);
 EUR3M_Boot = bootstrapCrab3M(EUR3M_Curve, OIS_Boot, settlementDate, true);
 % disp('=== EUR3M CRAB - NODI BOOTSTRAP ===')
 % disp(EUR3M_Boot.nodesTable)
@@ -42,7 +42,7 @@ EUR3M_Boot = bootstrapCrab3M(EUR3M_Curve, OIS_Boot, settlementDate, true);
 % disp(EUR3M_Boot.table)
 
 %% 2023 curves
-OIS_Boot_2 = discountingBootstrapOIS(settlementDate_2, OIS_Curve_2);
+OIS_Boot_2 = bootstrapOIS_vectorized(settlementDate_2, OIS_Curve_2);
 EUR3M_Boot_2 = bootstrapCrab3M(EUR3M_Curve_2, OIS_Boot_2, settlementDate_2, true);
 
 
