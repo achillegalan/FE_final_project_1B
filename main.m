@@ -44,7 +44,7 @@ EUR3M_Boot = bootstrapCrab3M(EUR3M_Curve, OIS_Boot, settlementDate, true);
 %% 2023 curves
 OIS_Boot_2 = bootstrapOIS_vectorized(settlementDate_2, OIS_Curve_2);
 EUR3M_Boot_2 = bootstrapCrab3M(EUR3M_Curve_2, OIS_Boot_2, settlementDate_2, true);
-
+%disp(EUR3M_Boot_2.table)
 
 %% Plot: OIS discount curve 2022 vs 2023 (MA ANCHE DA TOGLIERE)
 tau22 = yearfrac(settlementDate, OIS_Boot.dates, 3);
