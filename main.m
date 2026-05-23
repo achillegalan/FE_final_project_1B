@@ -15,21 +15,19 @@ addpath('pricing')
 refDate = datetime(2022, 6, 26);
 settlementDate = add_target_business_days(refDate, 2);
 curveFile  = fullfile('data', '20220626_Curve.xlsx');  
-curveColumns  = {'Term', 'Market Rate', 'Zero Rate', 'Discount'};
-curveScaling  = [1, 1/100, 1/100, 1];   % rates: % -> decimal
+curveColumns  = {'Term', 'Market Rate'};
 
-OIS_Curve = importExcellData(curveFile, 'OIS ESTR Curve', curveColumns, curveScaling);
-EUR3M_Curve = importExcellData(curveFile, '3MCurve', curveColumns, curveScaling);
+OIS_Curve = importExcellData(curveFile, 'OIS ESTR Curve', curveColumns);
+EUR3M_Curve = importExcellData(curveFile, '3MCurve', curveColumns);
 
 % 2023
 refDate_2 = datetime(2023, 1, 31);
 settlementDate_2 = add_target_business_days(refDate_2, 2);
 curveFile_2  = fullfile('data', '20230131_Curve.xlsx');  
-curveColumns  = {'Term', 'Market Rate', 'Zero Rate', 'Discount'};
-curveScaling  = [1, 1/100, 1/100, 1];
+curveColumns  = {'Term', 'Market Rate'};
 
-OIS_Curve_2   = importExcellData(curveFile_2, 'Curva OIS 31 Jan', curveColumns, curveScaling);
-EUR3M_Curve_2 = importExcellData(curveFile_2, 'Curve 3M 31 Jan',  curveColumns, curveScaling);
+OIS_Curve_2   = importExcellData(curveFile_2, 'Curva OIS 31 Jan', curveColumns);
+EUR3M_Curve_2 = importExcellData(curveFile_2, 'Curve 3M 31 Jan',  curveColumns);
 
 % Swap Amortizing
 swapData = importExcellData('SwapAmortizingPlan_v1.xlsx', 'SwapPlan', ...
@@ -39,9 +37,11 @@ swapData = importExcellData('SwapAmortizingPlan_v1.xlsx', 'SwapPlan', ...
 t_dates = convertTermtoDaysGeneralized(OIS_Curve.Term, settlementDate);
 
 P_D_calculated = discountingBootstrapOIS(settlementDate, OIS_Curve.MarketRate, t_dates);
+yearfracs_curve = yearfrac(settlementDate, t_dates, 2);
+P_D_market = 1 ./ (1 + yearfracs_curve .* OIS_Curve.MarketRate);
 
 figure;
-plot(t_dates, OIS_Curve.Discount, ['r-o'], 'DisplayName', 'Vendor Discount');
+plot(t_dates, P_D_market, ['r-o'], 'DisplayName', 'Discount from Market Rate');
 hold on;
 plot(t_dates, P_D_calculated, 'b-*', 'DisplayName', 'My Bootstrap');
 xlabel('Maturity Date'); ylabel('Discount Factor');
@@ -53,9 +53,11 @@ grid minor;
 t_dates = convertTermToDays(OIS_Curve_2.Term, settlementDate_2);
 
 P_D_calculated = discountingBootstrapOIS(settlementDate_2, OIS_Curve_2.MarketRate, t_dates);
+yearfracs_curve_2 = yearfrac(settlementDate_2, t_dates, 2);
+P_D_market_2 = 1 ./ (1 + yearfracs_curve_2 .* OIS_Curve_2.MarketRate);
 
 figure;
-plot(t_dates, OIS_Curve_2.Discount, 'r-o', 'DisplayName', 'Vendor Discount');
+plot(t_dates, P_D_market_2, 'r-o', 'DisplayName', 'Discount from Market Rate');
 hold on;
 plot(t_dates, P_D_calculated, 'b-*', 'DisplayName', 'My Bootstrap');
 xlabel('Maturity Date'); ylabel('Discount Factor');

@@ -1,39 +1,29 @@
-function data = importExcellData(filename, sheetName, columns, scalingFactors)
-% IMPORTSHEETDATA  Generic importer for any tabular Excel sheet.
+function data = importExcellData(filename, sheetName, columns)
+% IMPORTEXCELLDATA Generic importer for tabular Excel sheets.
 %
 % INPUTS:
 %   filename       - Path to the .xlsx file.
 %   sheetName      - Name of the sheet to read.
 %   columns        - Cell array of column names to extract (must match headers).
-%   scalingFactors - (Optional) numeric vector, same length as columns.
-%                    Each column is multiplied by its factor. Default: all 1s.
-%                    Use NaN to skip scaling on a specific column.
 %
 % OUTPUT:
 %   data - Scalar struct; each field is named after the cleaned column name
 %          (spaces stripped, leading/trailing whitespace removed).
 %
 % EXAMPLES:
-%   % Curve data (rates need /100 conversion)
-%   curveData = importSheetData('curves.xlsx', 'EUR6M', ...
-%       {'Term', 'Market Rate', 'Zero Rate', 'Discount'}, ...
-%       [1, 1/100, 1/100, 1]);
+%   % Curve data (Market Rate is automatically converted from % to decimal)
+%   curveData = importExcellData('curves.xlsx', 'EUR6M', ...
+%       {'Term', 'Market Rate'});
 %
 %   % Swap amortizing plan (no scaling needed)
-%   swapData = importSheetData('SwapAmortizingPlan_v1.xlsx', 'SwapPlan', ...
+%   swapData = importExcellData('SwapAmortizingPlan_v1.xlsx', 'SwapPlan', ...
 %       {'Pay Date', 'Accrual Start', 'Accrual End', 'Days', 'Notional'});
 
 % --- Input validation ---
 arguments
-    filename       (1,:) char
-    sheetName      (1,:) char
-    columns        (1,:) cell
-    scalingFactors (1,:) double = ones(1, numel(columns))
-end
-
-if numel(scalingFactors) ~= numel(columns)
-    error('importSheetData:sizeMismatch', ...
-        'scalingFactors must have the same length as columns (%d).', numel(columns));
+    filename  (1,:) char
+    sheetName (1,:) char
+    columns   (1,:) cell
 end
 
 % --- Read ---
@@ -44,7 +34,7 @@ dataTable = readtable(filename, ...
 % Validate requested columns exist
 missing = setdiff(columns, dataTable.Properties.VariableNames);
 if ~isempty(missing)
-    error('importSheetData:missingColumns', ...
+    error('importExcellData:missingColumns', ...
         'Column(s) not found in sheet "%s": %s', ...
         sheetName, strjoin(missing, ', '));
 end
@@ -57,20 +47,20 @@ data = struct();
 for i = 1:numel(columns)
     col = columns{i};
     values = dataTable.(col);
-    factor = scalingFactors(i);
 
-    % Apply scaling only to numeric columns and only if factor is not NaN
-    if isnumeric(values) && ~isnan(factor) && factor ~= 1
-        values = values .* factor;
+    % Convert Market Rate from percentage points to decimals (e.g., 2.50 -> 0.025)
+    normalizedCol = lower(regexprep(strtrim(col), '[\s_]+', ''));
+    if isnumeric(values) && strcmp(normalizedCol, 'marketrate')
+        values = values ./ 100;
     end
 
     % Warn on NaNs for numeric columns
     if isnumeric(values) && any(isnan(values))
-        warning('importSheetData:NaNFound', ...
+        warning('importExcellData:NaNFound', ...
             'NaN values found in column "%s" of sheet "%s".', col, sheetName);
     end
 
-    fieldName = matlab.lang.makeValidName(col);   % e.g. "Market Rate" -> "Market_Rate"
+    fieldName = matlab.lang.makeValidName(col);   % e.g. "Market Rate" -> "MarketRate"
     data.(fieldName) = values;
 end
 
