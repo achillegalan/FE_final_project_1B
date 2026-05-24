@@ -12,6 +12,8 @@ addpath('pricing')
 
 %% LOADING DATASET
 % 2022
+% tradeDate = datetime(2022, 6, 24);  --> usando questo come refDate, esce la stessa cosa per il settlement
+% una differenza cambierà nelle yearfract leggermente (RISENTIRE COSA DICE LOCATELLI)
 refDate = datetime(2022, 6, 26);
 settlementDate = add_target_business_days(refDate, 2);
 curveFile  = fullfile('data', '20220626_Curve.xlsx');  
@@ -67,12 +69,15 @@ legend('Location','best');
 fixedRate = 0.0221;
 
 %COMMENT: settledate computed as before leads to 28th, so good
-maturityYears = 15; paymentsPerYear = 4; 
-totalPeriods = maturityYears * paymentsPerYear;
-monthIncrements = calmonths(3 * (1:totalPeriods)');
+% maturityYears = 15; paymentsPerYear = 4; 
+% totalPeriods = maturityYears * paymentsPerYear;
+% monthIncrements = calmonths(3 * (1:totalPeriods)');
 
-payments_dates = settlementDate + monthIncrements;
-payments_dates_adjusted = modifiedFollowing(payments_dates);
+% payments_dates = settlementDate + monthIncrements;
+% payments_dates_adjusted = modifiedFollowing(payments_dates);
+% tutta questa parte è identica a  una riga sotto
+payments_dates_adjusted = swapData.PayDate;
+
 
 curveDates = OIS_Boot.dates;
 pseudocurveDates = EUR3M_Boot.dates;

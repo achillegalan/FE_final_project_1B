@@ -46,9 +46,7 @@ floatingPrice = dot(discountsOddTenors .* floatingLegfwdRates .* ...
                 + dot(discountsEvenTenors .* floatingLegfwdRates .* ...
                 yearfracsEvenTenors, ammortizedNotionalEven);
 
-%COMMENT: abs values since the sign depends on the POV of the contract
-%we are interested in the "absolute" price
-swapPrice = abs(floatingPrice - fixedPrice);
+swapPrice = floatingPrice - fixedPrice;
 
 end
 
