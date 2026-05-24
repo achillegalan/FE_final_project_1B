@@ -99,36 +99,81 @@ function curve = bootstrapCrab3M(mkt, oisCurve, settlementDate, flag)
     [curveDates, uniqueIdx] = unique(curveDates, 'stable');
     curveDisc = curveDisc(uniqueIdx);
 
-    %% 3. Swaps
+   %% 3. Swaps (sequential bootstrap; vectorized preprocessing only)
     swapIdx = find(endsWith(terms, "YR"));
 
-    for k = 1:numel(swapIdx)
-        idx = swapIdx(k);
-        swapTerm = terms(idx);
-        swapRate = rates(idx);
-        maturityYears = sscanf(swapTerm, '%d YR');
+    if isempty(swapIdx)
+        error('bootstrapCrab3M:missingSwaps', ...
+            'No swap instruments (terms ending with "YR") found in market data.');
+    end
 
-        maturityDate = add_target_months(settlementDate, 12*maturityYears, 'modifiedfollow');
+    % Vectorized extraction of swap terms and rates
+    swapTerms = terms(swapIdx);
+    swapRates = rates(swapIdx);
 
-        % if we have already the date, skip
+    % Vectorized parsing: "5 YR" -> 5
+    swapYears = str2double(extractBefore(swapTerms, " YR"));
+    if any(isnan(swapYears))
+        error('bootstrapCrab3M:invalidSwapTerm', ...
+            'At least one swap term could not be parsed. Expected format like "5 YR".');
+    end
+
+    % Vectorized maturity-date generation, then chronological ordering
+    swapMatDates = arrayfun(@(y) add_target_months(settlementDate, 12*y, 'modifiedfollow'), swapYears);
+    [swapMatDates, ord] = sort(swapMatDates);
+    swapRates = swapRates(ord);
+
+    for k = 1:numel(swapMatDates)
+        maturityDate = swapMatDates(k);
+        swapRate = swapRates(k);
+
+        % If this maturity is already a known node, there is nothing to bootstrap.
         if any(curveDates == maturityDate)
             continue
         end
 
         allCalcDates(end+1,1) = maturityDate;
 
-        % find fixed and floating leg dates
+        % Build coupon schedules once for this swap maturity.
         floatDates = makeSchedule(settlementDate, maturityDate, 3, 'modifiedfollow');
         fixedDates = makeSchedule(settlementDate, maturityDate, 12, 'modifiedfollow');
         allCalcDates = [allCalcDates; floatDates(:); fixedDates(:)];
-        
-        obj = @(PN) swapObjectiveCrab(PN, settlementDate, ...
-            maturityDate, swapRate, curveDates, curveDisc, oisCurve);
 
+        % Split floating schedule into period start/end and accrual fractions.
+        floatStart = floatDates(1:end-1);
+        floatEnd = floatDates(2:end);
+        floatDelta = yearfrac(floatStart, floatEnd, 2); % ACT/360
+
+        % Split fixed schedule into period start/end and accrual fractions.
+        fixedPrev = fixedDates(1:end-1);
+        fixedEnd = fixedDates(2:end);
+        fixedDelta = yearfrac(fixedPrev, fixedEnd, 6); % 30/360
+
+        % Precompute OIS discount factors at floating and fixed payment dates.
+        % These do not depend on PN, so we compute them once (outside fzero calls).
+        oisDiscFloatEnd = arrayfun(@(d) get_discount_factor_by_zero_rates_linear_interp( ...
+            oisCurve.settlementDate, d, oisCurve.dates, oisCurve.discounts), floatEnd);
+        oisDiscFixedEnd = arrayfun(@(d) get_discount_factor_by_zero_rates_linear_interp( ...
+            oisCurve.settlementDate, d, oisCurve.dates, oisCurve.discounts), fixedEnd);
+
+        % Cache all swap-specific constants to avoid recomputation in objective function.
+        swapCache = struct();
+        swapCache.floatStart = floatStart;
+        swapCache.floatEnd = floatEnd;
+        swapCache.floatDelta = floatDelta;
+        swapCache.oisDiscFloatEnd = oisDiscFloatEnd;
+        swapCache.fixedLegConst = swapRate * sum(fixedDelta .* oisDiscFixedEnd);
+
+        % Objective: solve for PN such that floating leg - fixed leg = 0.
+        obj = @(PN) swapObjectiveCrab(PN, settlementDate, ...
+            maturityDate, swapRate, curveDates, curveDisc, swapCache);
+
+        % Initial PN guess from last known node using exponential decay.
         lastDisc = curveDisc(end);
         guess = lastDisc * exp(-swapRate * yearfrac(curveDates(end), maturityDate, 3));
 
-        lower = max(1e-8, 0.30 * guess);    % to avoid negative discounts
+        % Prefer bracketed root finding; fallback to single-point start if needed.
+        lower = max(1e-8, 0.30 * guess);   % enforce positive DF
         upper = min(1.50, 1.70 * guess);
         fLower = obj(lower);
         fUpper = obj(upper);
@@ -139,6 +184,7 @@ function curve = bootstrapCrab3M(mkt, oisCurve, settlementDate, flag)
             PN = fzero(obj, [lower upper]);
         end
 
+        % Add the solved node and keep curve vectors sorted and deduplicated.
         curveDates(end+1,1) = maturityDate;
         curveDisc(end+1,1)  = PN;
 
@@ -147,7 +193,6 @@ function curve = bootstrapCrab3M(mkt, oisCurve, settlementDate, flag)
         [curveDates, uniqueIdx] = unique(curveDates, 'stable');
         curveDisc = curveDisc(uniqueIdx);
     end
-
 
     %% Zero-rates 
     % for curveDates

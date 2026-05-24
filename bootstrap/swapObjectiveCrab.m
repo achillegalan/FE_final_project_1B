@@ -1,5 +1,5 @@
 function value = swapObjectiveCrab(PN, settlementDate, maturityDate, swapRate, ...
-                                   knownDates, knownDisc, oisCurve)
+                                   knownDates, knownDisc, swapCache)
 % SWAPOBJECTIVECRAB Objective for swap bootstrap.
 % INPUTS:
 %   PN             - Candidate pseudo-discount factor at the swap maturity.
@@ -8,12 +8,22 @@ function value = swapObjectiveCrab(PN, settlementDate, maturityDate, swapRate, .
 %   swapRate       - Quoted fixed swap rate as a decimal.
 %   knownDates     - Vector of datetime objects for known pseudo-curve nodes.
 %   knownDisc      - Vector of known pseudo-discount factors.
-%   oisCurve       - Structure containing OIS discount curve data, with fields:
-%                    dates, discounts, settlementDate.
+%   oisInput       - Either:
+%                    (A) structure with OIS discount curve fields:
+%                        dates, discounts, settlementDate; or
+%                    (B) precomputed swap cache with fields:
+%                        floatStart, floatEnd, floatDelta,
+%                        oisDiscFloatEnd, fixedLegConst.
 %
 % OUTPUTS:
 %   value - Difference between floating leg and fixed leg.
 %           The bootstrap solves value = 0 for PN.
+
+    floatStart = swapCache.floatStart;
+    floatEnd = swapCache.floatEnd;
+    floatDelta = swapCache.floatDelta;
+    oisDiscFloatEnd = swapCache.oisDiscFloatEnd;
+    fixedLeg = swapCache.fixedLegConst;
 
     % Add to the known curve the possible discount factor
     tmpDates = [knownDates; maturityDate];
@@ -21,10 +31,6 @@ function value = swapObjectiveCrab(PN, settlementDate, maturityDate, swapRate, .
 
     %% Floating leg
     floatingLeg = 0;
-    floatDates = makeSchedule(settlementDate, maturityDate, 3, 'modifiedfollow');
-    floatStart = floatDates(1:end-1);
-    floatEnd = floatDates(2:end);
-    floatDelta = yearfrac(floatStart, floatEnd, 2);
 
     for j = 1:numel(floatEnd)
         Tstart = floatStart(j);
@@ -34,27 +40,13 @@ function value = swapObjectiveCrab(PN, settlementDate, maturityDate, swapRate, .
             settlementDate, Tstart, tmpDates, tmpDisc);
         Pend   = get_discount_factor_by_zero_rates_linear_interp( ...
             settlementDate, Tend, tmpDates, tmpDisc);
+        
         forward3M = (Pstart / Pend - 1) / delta;
+        oisDiscEnd = oisDiscFloatEnd(j);
 
-        oisDiscEnd = get_discount_factor_by_zero_rates_linear_interp( ...
-            oisCurve.settlementDate, Tend, oisCurve.dates, oisCurve.discounts);
         floatingLeg = floatingLeg + delta * forward3M * oisDiscEnd;
     end
 
-    %% Fixed leg
-    fixedLeg = 0;
-    fixedDates = makeSchedule(settlementDate, maturityDate, 12, 'modifiedfollow');
-    fixedPrev = fixedDates(1:end-1);
-    fixedEnd = fixedDates(2:end);
-    fixedDelta = yearfrac(fixedPrev, fixedEnd, 6);
-
-    for i = 1:numel(fixedEnd)
-        delta = fixedDelta(i);
-        Tend  = fixedEnd(i);
-        oisDiscEnd = get_discount_factor_by_zero_rates_linear_interp( ...
-            oisCurve.settlementDate, Tend, oisCurve.dates, oisCurve.discounts);
-        fixedLeg = fixedLeg + swapRate * delta * oisDiscEnd;
-    end
-
+    %% total
     value = floatingLeg - fixedLeg;
 end
