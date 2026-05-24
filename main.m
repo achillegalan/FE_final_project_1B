@@ -36,7 +36,7 @@ swapData = importExcellData('SwapAmortizingPlan_v1.xlsx', 'SwapPlan', ...
     {'Pay Date', 'Accrual Start', 'Accrual End', 'Days', 'Notional'});
 
 %% 2022 curves
-OIS_Boot = bootstrapOIS_vectorized(settlementDate, OIS_Curve);
+OIS_Boot = bootstrapOIS(settlementDate, OIS_Curve);
 EUR3M_Boot = bootstrapCrab3M(EUR3M_Curve, OIS_Boot, settlementDate, true);
 % disp('=== EUR3M CRAB - NODI BOOTSTRAP ===')
 % disp(EUR3M_Boot.nodesTable)
@@ -44,7 +44,7 @@ EUR3M_Boot = bootstrapCrab3M(EUR3M_Curve, OIS_Boot, settlementDate, true);
 % disp(EUR3M_Boot.table)
 
 %% 2023 curves
-OIS_Boot_2 = bootstrapOIS_vectorized(settlementDate_2, OIS_Curve_2);
+OIS_Boot_2 = bootstrapOIS(settlementDate_2, OIS_Curve_2);
 EUR3M_Boot_2 = bootstrapCrab3M(EUR3M_Curve_2, OIS_Boot_2, settlementDate_2, true);
 %disp(EUR3M_Boot_2.table)
 
@@ -61,11 +61,7 @@ xlabel('Maturity (years)');
 ylabel('Discount Factor');
 title('OIS Discount Curves: 2022 vs 2023');
 legend('Location','best');
-
-
 %% task 2: NPV_riskfree Ammortized Swap
-
-%COMMENT: obviously everything must be still made looking good
 fixedRate = 0.0221;
 
 %COMMENT: settledate computed as before leads to 28th, so good
@@ -82,8 +78,7 @@ payments_dates_adjusted = swapData.PayDate;
 curveDates = OIS_Boot.dates;
 pseudocurveDates = EUR3M_Boot.dates;
 
-%%
 swap = AmmortizedSwapPricer(payments_dates_adjusted, curveDates, pseudocurveDates, ...
     swapData.Notional, OIS_Boot.zeroRates, EUR3M_Boot.zeroRates, fixedRate, ...
     settlementDate);
-disp(swap)
+fprintf("Swap price from Bank perspective (MtM) is: %.2f EUR\n", swap);
