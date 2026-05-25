@@ -20,65 +20,64 @@ function [survivalProbabilities, hazardRates, cdsDates] = ...
 %   cdsDates              - Echo of input cdsDates.
 
 settleDate = OIS_curve.settlementDate;
-
 cdsDates = cdsDates(:);
+N = numel(cdsDates); 
 
 if isscalar(cdsSpreads)
     cdsSpreads = repmat(cdsSpreads, N, 1);  % Expand scalar spreads to match the number of dates
 end
-
 cdsSpreads = cdsSpreads(:);
 
-N = numel(cdsDates);
-
 % Precompute everything that does not change across the loop
-
 allDates = [settleDate; cdsDates];          % T_0, T_1, ..., T_N
 
-%COMMENT: basically if yearfrac(v1, v2) and v1 and v2 have same length,
-%then it is a element - wise yearfrac computation
-accrualFracs = yearfrac(allDates(1:end-1), cdsDates, 2);   % ACT/360
-bucketLengths = yearfrac(allDates(1:end-1), cdsDates, 3);  % ACT/ACT for hazard
+% Element-wise year fraction computations
+accrualFracs = yearfrac(allDates(1:end-1), cdsDates, 2);   % ACT/360 for premium leg
+bucketLengths = yearfrac(allDates(1:end-1), cdsDates, 2);  % ACT/360 to match curve rules
 discounts = getTargetDF(settleDate, OIS_curve.dates, OIS_curve.zeroRates, cdsDates);
 
-% Bootstrap Survival Prob
+% Bootstrap Survival Probabilities
 survivalProbabilities = zeros(N, 1);
 hazardRates = zeros(N, 1);
 
 for n = 1:N
     % Known survival: Q(T_0)=1, Q(T_1), ..., Q(T_{n-1})
     knownSurvival = [1; survivalProbabilities(1:n-1)];
-
+    
     % Slices up to and including the current tenor
     payFracs = accrualFracs(1:n);
     payDisc = discounts(1:n);
     dt = bucketLengths(n);
     prevSurv = knownSurvival(end);   % Q(T_{n-1})
     s = cdsSpreads(min(n, end));
-
+    
     objective = @(h) cdsObjective(h, s, LGD, payFracs, payDisc, ...
         knownSurvival, prevSurv, dt);
-
-    hazardRates(n) = fzero(objective, [0, 1]);
+    
+    % Root-finding bounds to [0, 1] 
+    hazardRates(n) = fzero(objective, [0, 1]); 
     survivalProbabilities(n) = prevSurv * exp(-hazardRates(n) * dt);
 end
 
 end
 
 % -------------------------------------------------------------------------
-
 function value = cdsObjective(h, spread, LGD, accrualFracs, discounts, ...
     knownSurvival, prevSurv, dt)
-% knownSurvival = [Q(T_0); Q(T_1); ...; Q(T_{n-1})]  (length n)
-% Trial Q(T_n):
+% Evaluation of the full contract mark-to-market up to bucket 'n'
 
+% Trial Q(T_n):
 Q_n = prevSurv * exp(-h * dt);
 
 survivalEnd = [knownSurvival(2:end); Q_n];   % Q(T_1), ..., Q(T_n)
 survivalStart = knownSurvival;                  % Q(T_0), ..., Q(T_{n-1})
 
+% Premium Leg MTM component
 premiumLeg = spread * sum(accrualFracs .* discounts .* survivalEnd);
+
+% Protection Leg MTM component (assuming default payments at the end of quarterly intervals)
 protectionLeg = LGD * sum(discounts .* (survivalStart - survivalEnd));
 
-value = premiumLeg - protectionLeg;
+% Root-finder searches for the point where Protection PV = Premium PV
+value = premiumLeg - protectionLeg; 
 end
