@@ -1,24 +1,26 @@
 function [CVA, survProbs] = computeCVA( ...
-     OIS_curve, EUR3M_curve, paymentDates, strike, normalVol, TTMs, Notional, ...
-     isPayer, fixingFrequency,cdsSpreads,LGD)
+     OIS_curve, EUR3M_curve, paymentDates, strike, normalVol, Notional, ...
+     isPayer, fixingFrequency, cdsSpreads, LGD)
 
-% Bootstrapping the survival probabilities from CDS market data (Vectorized
-% as possible)
+% Bootstrapping the survival probabilities from CDS market data
 survProbs = bootstrapSurvivalProbabilities(OIS_curve, paymentDates, cdsSpreads, LGD);
-CVAsurvProbs = survProbs(1:end-1) - survProbs(2:end);
 
-% Computing the Swaptions in CVA
-% COMMENT: not suggested vectorization! it is likely that trying to
-% vectorize over a for loop will not win the trade off with not having to
-% write a function which is a pain in the ass
-swaptionPrices = zeros(numel(TTMs), 1);
+% The CVA summation requires Q(t_{i-1}) - Q(t_i). We prepend Q(t_0) = 1.
+survProbsFull = [1; survProbs];
+CVAsurvProbs = survProbsFull(1:end-1) - survProbsFull(2:end);
 
-for i = 1:numel(TTMs)
+numPeriods = numel(paymentDates);
+% The formula specifies summation up to (b-1), meaning the last swaption expires at t_{b-1}
+swaptionPrices = zeros(numPeriods - 1, 1);
+
+for i = 1:(numPeriods - 1)
+    exerciseDate = paymentDates(i);
     swaptionPrices(i) = bachelierPSSwaptionPricer( ...
         OIS_curve, EUR3M_curve, paymentDates, strike, normalVol, ...
-        TTMs(i), Notional, isPayer, fixingFrequency);
+        exerciseDate, Notional, isPayer, fixingFrequency);
 end
 
-CVA = LGD * sum(CVAsurvProbs .* swaptionPrices);
+% CVA calculation matching exactly the mathematical summation logic provided.
+CVA = LGD * sum(CVAsurvProbs(1:end-1) .* swaptionPrices);
 
 end

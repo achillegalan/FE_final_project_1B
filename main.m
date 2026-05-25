@@ -73,7 +73,55 @@ swap_semiannual = AmmortizedSwapPricer( ...
     swapData, OIS_Boot, EUR3M_Boot, settlementDate, fixedRate, 'semiannual', []);
 fprintf("Swap price from Bank perspective (MtM) [reset: quarterly] is: %.2f EUR\n", swap_quarterly);
 fprintf("Swap price from Bank perspective (MtM) [reset: semiannual] is: %.2f EUR\n", swap_semiannual);
+%% Task 3: Amortizing Swap Pricing with CVA: simplified approach
+disp('=== Task 3: CVA Computation ===')
 
+normalVol = loadSwaptionVols();
+
+% Extracting payment dates and notionals reliably
+try
+    paymentDates = swapData.PayDate;
+catch
+    try
+        paymentDates = swapData.Pay_Date;
+    catch
+        paymentDates = swapData{:, 1}; % Fallback
+    end
+end
+
+try
+    Notional = swapData.Notional;
+catch
+    Notional = swapData{:, 5}; % Fallback
+end
+
+strike = fixedRate;
+% Bank receives Euribor 3M, pays 2.21%. 
+% The exposure to Corporate default happens when the swap value is positive to Bank. 
+% An option to enter a Pay-Fixed Swap is a Payer Swaption.
+isPayer = true; 
+fixingFrequency = 'quarterly';
+LGD = 0.40;
+
+% Scenario 1: CDS Spread = 300 bps
+cdsSpreads_300 = 0.03; 
+[CVA_300, survProbs_300] = computeCVA( ...
+    OIS_Boot, EUR3M_Boot, paymentDates, strike, normalVol, Notional, ...
+    isPayer, fixingFrequency, cdsSpreads_300, LGD);
+    
+% Scenario 2: CDS Spread = 500 bps
+cdsSpreads_500 = 0.05; 
+[CVA_500, survProbs_500] = computeCVA( ...
+    OIS_Boot, EUR3M_Boot, paymentDates, strike, normalVol, Notional, ...
+    isPayer, fixingFrequency, cdsSpreads_500, LGD);
+    
+NPV_300 = swap_quarterly - CVA_300;
+NPV_500 = swap_quarterly - CVA_500;
+
+fprintf("CVA (CDS = 300 bps)          : %.2f EUR\n", CVA_300);
+fprintf("Swap NPV with CVA (300 bps)  : %.2f EUR\n", NPV_300);
+fprintf("CVA (CDS = 500 bps)          : %.2f EUR\n", CVA_500);
+fprintf("Swap NPV with CVA (500 bps)  : %.2f EUR\n\n", NPV_500);
 
 %% task 4
 % DA CONTROLLARE SU INTERNET IL RATE!!!!!!!!!!!!!!!!!!!!!!!!
