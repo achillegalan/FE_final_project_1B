@@ -60,13 +60,14 @@ for i = 1:n_knots
     for p = 2:(numel(pay_dates)-1)
         pay_date = pay_dates(p);
 
-        known_t = yearfracs(1:i-1);
+        known_t = yearfrac(settlementDate, OIS_df_dates(1:i-1), 3); %ACT/365
         known_r = -log(OIS_df(1:i-1)) ./ known_t;
-        target_t = yearfrac(settlementDate, pay_date, 2);
+
+        target_t = yearfrac(settlementDate, pay_date, 3); 
         interp_r = interp1(known_t, known_r, target_t, 'linear', 'extrap');
         df_pay = exp(-interp_r * target_t);
 
-        delta_k = yearfrac(pay_dates(p-1), pay_date, 2);
+        delta_k = yearfrac(pay_dates(p-1), pay_date, 2); 
         BPV = BPV + delta_k * df_pay;
     end
 

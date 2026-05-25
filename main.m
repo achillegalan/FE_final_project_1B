@@ -36,7 +36,7 @@ swapData = importExcellData('SwapAmortizingPlan_v1.xlsx', 'SwapPlan', ...
     {'Pay Date', 'Accrual Start', 'Accrual End', 'Days', 'Notional'});
 
 %% 2022 curves
-OIS_Boot = bootstrapOIS_vectorized(settlementDate, OIS_Curve);
+OIS_Boot = bootstrapOIS(settlementDate, OIS_Curve);
 EUR3M_Boot = bootstrapCrab3M(EUR3M_Curve, OIS_Boot, settlementDate, true);
 % disp('=== EUR3M CRAB - NODI BOOTSTRAP ===')
 % disp(EUR3M_Boot.nodesTable)
@@ -44,13 +44,13 @@ EUR3M_Boot = bootstrapCrab3M(EUR3M_Curve, OIS_Boot, settlementDate, true);
 % disp(EUR3M_Boot.table)
 
 %% 2023 curves
-OIS_Boot_2 = bootstrapOIS_vectorized(settlementDate_2, OIS_Curve_2);
+OIS_Boot_2 = bootstrapOIS(settlementDate_2, OIS_Curve_2);
 EUR3M_Boot_2 = bootstrapCrab3M(EUR3M_Curve_2, OIS_Boot_2, settlementDate_2, true);
 %disp(EUR3M_Boot_2.table)
 
 %% Plot: OIS discount curve 2022 vs 2023 (MA ANCHE DA TOGLIERE)
-% tau22 = yearfrac(settlementDate, OIS_Boot.dates, 3);
-% tau23 = yearfrac(settlementDate_2, OIS_Boot_2.dates, 3);
+tau22 = yearfrac(settlementDate, OIS_Boot.dates, 3);
+tau23 = yearfrac(settlementDate_2, OIS_Boot_2.dates, 3);
 
 % figure;
 % plot(tau22, OIS_Boot.discounts, '-o', 'LineWidth', 1.3, 'DisplayName', 'OIS 2022');
@@ -64,8 +64,6 @@ EUR3M_Boot_2 = bootstrapCrab3M(EUR3M_Curve_2, OIS_Boot_2, settlementDate_2, true
 
 
 %% task 2: NPV_riskfree Ammortized Swap
-
-%COMMENT: obviously everything must be still made looking good
 fixedRate = 0.0221;
 
 %COMMENT: settledate computed as before leads to 28th, so good
@@ -88,4 +86,5 @@ swap_quarterly = AmmortizedSwapPricer(payments_dates_adjusted, curveDates, pseud
 swap_semiannual = AmmortizedSwapPricer(payments_dates_adjusted, curveDates, pseudocurveDates, ...
     swapData.Notional, OIS_Boot.zeroRates, EUR3M_Boot.zeroRates, fixedRate, ...
     settlementDate, 'semiannual')  
+fprintf("Swap price from Bank perspective (MtM) is: %.2f EUR\n", swap);
 
