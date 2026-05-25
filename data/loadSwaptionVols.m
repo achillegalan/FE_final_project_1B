@@ -1,13 +1,28 @@
 function volsData = loadSwaptionVols()
 % LOADSWAPTIONVOLS Loads the Bachelier swaption volatility cube for the project.
-%   Reference Date: 26-Jun-2022 (Trade Date)
-%   Source Data: Bloomberg / ICAP dataset
 
     % Define the coordinate axis metadata (Expiries and Tenors in years)
+    settlementDate = datetime(2022, 6, 26); % add_target_business_days(tradeDate, 2)
+    
+    % Define the target months corresponding to each matrix row grid point
+    expiryMonths = [1, 3, 6, 9, 12, 24, 36, 48, 60, 72, 84, 96, 108, 120, 144, 180, 240, 300, 360];
+    numExpiries = length(expiryMonths);
+    
+    % Pre-allocate the dynamic target coordinates as a native datetime array
+    expiryDates = NaT(numExpiries, 1);
+    volsData.expiriesNum = zeros(1, numExpiries);
+    
+    for i = 1:numExpiries
+        % Roll forward using the Modified Following convention as dictated by the termsheet
+        expiryDates(i) = add_target_months(settlementDate, expiryMonths(i), 'modifiedfollow');
+        
+        % Calculate the precise interpolation coordinate using standard day-count rules
+        volsData.expiriesNum(i) = yearfrac(settlementDate, expiryDates(i), 3); 
+    end
+
     volsData.expiriesStr = {'1Mo','3Mo','6Mo','9Mo','1Yr','2Yr','3Yr','4Yr','5Yr',...
                             '6Yr','7Yr','8Yr','9Yr','10Yr','12Yr','15Yr','20Yr','25Yr','30Yr'};
-    volsData.expiriesNum = [1/12, 3/12, 6/12, 9/12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20, 25, 30];
-
+    
     volsData.tenorsStr   = {'1Yr','2Yr','3Yr','4Yr','5Yr','7Yr','10Yr','12Yr','15Yr','20Yr','25Yr','30Yr'};
     volsData.tenorsNum   = [1, 2, 3, 4, 5, 7, 10, 12, 15, 20, 25, 30];
 
