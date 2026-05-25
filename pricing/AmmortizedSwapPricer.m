@@ -1,10 +1,23 @@
 function swapPrice = AmmortizedSwapPricer( ...
     swapData, oisCurve, pseudoCurve, settlementDate, fixedRate, resetType, knownFixing)
 
-
-%COMMENT: Thanks to God the payment dates for both legs are the same ;)
-%COMMENT: i will comment better in the docstring, but this filtering of
-%pseudodiscounts comes from the annex
+%AMMORTIZEDSWAPPRICER Price an amortizing IRS from the bank perspective.
+%
+% Computes the risk-free MtM of an amortizing swap:
+%   swapPrice = PV(floating leg) - PV(fixed leg)
+%
+% Inputs:
+%   swapData     Table/struct with PayDate, AccrualStart, AccrualEnd, Notional.
+%   oisCurve     OIS discounting curve with dates and continuous zeroRates.
+%   pseudoCurve  EUR3M projection curve with dates and continuous zeroRates.
+%   valuationDate  Pricing date; only PayDate > valuationDate are considered.
+%   fixedRate    Fixed coupon rate, in decimal form.
+%   resetType    'quarterly' or 'semiannual'. Default: 'quarterly'.
+%   knownFixing  Optional struct with resetStartDate and resetRate for
+%                already-fixed coupons.
+%
+% Outputs:
+%   swapPrice     Bank MtM: receive floating, pay fixed.
 
 % Defaults
 if nargin < 6 || isempty(resetType)
@@ -29,32 +42,32 @@ pseudozeroRates  = pseudoCurve.zeroRates(:);
 knownDates = knownFixing.resetStartDate(:);
 knownRates = knownFixing.resetRate(:);
 
-nFull = numel(paymentDates);
-
-%% Map each coupon to its reset start date on FULL schedule
-switch resetType
-    case "quarterly"
-        resetStartFull = accrualStartDates;
-        resetEndFull   = accrualEndDates;
-    case "semiannual"
-        pairStartIdx = 2 * ceil((1:nFull)' / 2) - 1;         % 1,1,3,3,...
-        % Legacy convention requested: use the first 3M fixing of each
-        % semiannual pair for both quarterly coupons in the pair.
-        pairEndIdx   = pairStartIdx;                          
-        resetStartFull = accrualStartDates(pairStartIdx);
-        resetEndFull   = accrualEndDates(pairEndIdx);
-    otherwise
-            error('resetType must be ''quarterly'' or ''semiannual''.');
-end
-
 %% Keep only future payment flows
-check = paymentDates > settlementDate;
+check = paymentDates > settlementDate;   % tieni solo pagamenti futuri
 payDates = paymentDates(check);
 accStart = accrualStartDates(check);
 accEnd = accrualEndDates(check);
 notional = ammortizedNotional(check);
-resetStart = resetStartFull(check);
-resetEnd = resetEndFull(check);
+keptFullIdx = find(check);
+
+%% Map reset dates for kept coupons
+resetType = lower(string(strtrim(resetType)));
+
+switch resetType
+    case "quarterly"
+        resetStart = accStart;
+        resetEnd = accEnd;
+
+    case "semiannual"
+        % Legacy: stesso 3M fixing del primo trimestre della coppia
+        pairStartIdxFull = 2 * ceil(keptFullIdx / 2) - 1;   % 1,1,3,3,...
+        resetStart = accrualStartDates(pairStartIdxFull);
+        resetEnd = accrualEndDates(pairStartIdxFull);
+
+    otherwise
+        error('AmmortizedSwapPricer:InvalidResetType', ...
+            'resetType must be ''quarterly'' or ''semiannual''.');
+end
 
 %% Year fractions and discounting
 yearfracs = yearfrac(accStart, accEnd, 2); % ACT/360
