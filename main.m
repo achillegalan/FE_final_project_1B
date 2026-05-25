@@ -49,8 +49,8 @@ EUR3M_Boot_2 = bootstrapCrab3M(EUR3M_Curve_2, OIS_Boot_2, settlementDate_2, true
 %disp(EUR3M_Boot_2.table)
 
 %% Plot: OIS discount curve 2022 vs 2023 (MA ANCHE DA TOGLIERE)
-tau22 = yearfrac(settlementDate, OIS_Boot.dates, 3);
-tau23 = yearfrac(settlementDate_2, OIS_Boot_2.dates, 3);
+% tau22 = yearfrac(settlementDate, OIS_Boot.dates, 3);
+% tau23 = yearfrac(settlementDate_2, OIS_Boot_2.dates, 3);
 
 % figure;
 % plot(tau22, OIS_Boot.discounts, '-o', 'LineWidth', 1.3, 'DisplayName', 'OIS 2022');
@@ -76,9 +76,28 @@ fprintf("Swap price from Bank perspective (MtM) [reset: semiannual] is: %.2f EUR
 
 
 %% task 4
-% DA CONTROLLARE SU INTERNET IL RATE!!!!!!!!!!!!!!!!!!!!!!!!
+% the rate is taken by ...
 knownFixing = struct('resetStartDate', datetime(2022,12,28), 'resetRate', 0.02202);
 
 swap_unwind = AmmortizedSwapPricer( ...
     swapData, OIS_Boot_2, EUR3M_Boot_2, settlementDate_2, fixedRate, 'quarterly', knownFixing);
 fprintf("Swap price from Bank perspective (MtM) [reset: quarterly] is: %.2f EUR\n", swap_unwind);
+
+%% task 5
+gammas = [0, 0.5, 1];
+
+diagSwaptions2022 = table( ...
+    ["1y"; "3y"; "5y"; "8y"; "10y"; "12y"; "15y"], ...
+    ["15y"; "12y"; "10y"; "7y"; "5y"; "3y"; "1y"], ...
+    [106.52; 91.17; 84.75; 78.38; 76.55; 76.63; 76.42], ...
+    'VariableNames', {'Expiry','Tenor','NormalVol_bps'});
+diagSwaptions2023 = table( ...
+    ["1y"; "3y"; "5y"; "8y"; "10y"; "12y"; "15y"], ...
+    ["15y"; "12y"; "10y"; "7y"; "5y"; "3y"; "1y"], ...
+    [95.95; 90.41; 84.93; 80.43; 78.77; 79.46; 79.97], ...
+    'VariableNames', {'Expiry','Tenor','NormalVol_bps'});
+
+diagMkt2022 = buildDiagonalSwaptionMarketData(OIS_Boot, EUR3M_Boot, diagSwaptions2022, true, "quarterly");
+diagMkt2023 = buildDiagonalSwaptionMarketData(OIS_Boot_2, EUR3M_Boot_2, diagSwaptions2023, true, "quarterly");
+disp(diagMkt2022.summary)
+disp(diagMkt2023.summary)
