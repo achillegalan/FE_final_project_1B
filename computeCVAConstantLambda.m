@@ -1,7 +1,7 @@
-function [CVA, survProbs] = computeCVA( ...
+function [CVA, survProbs] = computeCVAConstantLambda( ...
      OIS_curve, EUR3M_curve, paymentDates, strike, normalVol, Notional, ...
      isPayer, fixingFrequency, cdsSpreads, LGD)
-% COMPUTECVA Computes CVA assuming a piecewise constant hazard rate.
+% COMPUTECVACONSTANTLAMBDA Computes CVA assuming a strictly constant hazard rate.
 %
 % INPUTS:
 %   OIS_curve       - Struct containing settlementDate, dates, zeroRates.
@@ -15,15 +15,23 @@ function [CVA, survProbs] = computeCVA( ...
 %   cdsSpreads      - Given CDS spread in decimal form (e.g., 300 bps = 0.03).
 %   LGD             - Loss Given Default parameter (e.g., 40% = 0.40).
 
-% Bootstrapping the survival probabilities from CDS market data
-survProbs = bootstrapSurvivalProbabilities(OIS_curve, paymentDates, cdsSpreads, LGD);
+settleDate = OIS_curve.settlementDate;
+paymentDates = paymentDates(:);
 
-% The CVA summation requires Q(t_{i-1}) - Q(t_i). We prepend Q(t_0) = 1.
+% 1. Compute direct survival probabilities using a continuous constant lambda
+%    (Assumes the first element of cdsSpreads represents the flat curve target)
+constant_lambda = cdsSpreads(1) / LGD; 
+yearsFromSettle = yearfrac(settleDate, paymentDates, 2); % ACT/360 convention
+
+% Q(0, T_i) calculated directly via exponential decay
+survProbs = exp(-constant_lambda * yearsFromSettle);
+
+% 2. Establish the default probability chunks: Q(t_{i-1}) - Q(t_i)
 survProbsFull = [1; survProbs];
 CVAsurvProbs = survProbsFull(1:end-1) - survProbsFull(2:end);
 
+% 3. Portfolio Exposure Summation Engine
 numPeriods = numel(paymentDates);
-% The formula specifies summation up to (b-1), meaning the last swaption expires at t_{b-1}
 swaptionPrices = zeros(numPeriods - 1, 1);
 
 for i = 1:(numPeriods - 1)
@@ -33,7 +41,7 @@ for i = 1:(numPeriods - 1)
         exerciseDate, Notional, isPayer, fixingFrequency);
 end
 
-% CVA calculation matching exactly the mathematical summation logic provided.
+% Compute the final expected valuation adjustment
 CVA = LGD * sum(CVAsurvProbs(1:end-1) .* swaptionPrices);
 
 end

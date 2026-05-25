@@ -95,19 +95,25 @@ cdsSpreads_300 = 0.03;
 [CVA_300, survProbs_300] = computeCVA( ...
     OIS_Boot, EUR3M_Boot, paymentDates, strike, normalVol, Notional, ...
     isPayer, fixingFrequency, cdsSpreads_300, LGD);
-    
+[CVA_300_cost, survProbs_300_cost] = computeCVAConstantLambda( ...
+     OIS_Boot, EUR3M_Boot, paymentDates, strike, normalVol, Notional, ...
+     isPayer, fixingFrequency, cdsSpreads_300, LGD);    
 % Scenario 2: CDS Spread = 500 bps
 cdsSpreads_500 = 0.05; 
 [CVA_500, survProbs_500] = computeCVA( ...
     OIS_Boot, EUR3M_Boot, paymentDates, strike, normalVol, Notional, ...
     isPayer, fixingFrequency, cdsSpreads_500, LGD);
-    
+[CVA_500_cost, survProbs_500_cost] = computeCVAConstantLambda( ...
+     OIS_Boot, EUR3M_Boot, paymentDates, strike, normalVol, Notional, ...
+     isPayer, fixingFrequency, cdsSpreads_500, LGD);    
 NPV_300 = swap_quarterly - CVA_300;
 NPV_500 = swap_quarterly - CVA_500;
 
 fprintf("CVA (CDS = 300 bps)          : %.2f EUR\n", CVA_300);
+fprintf("CVA cost (CDS = 300 bps)     : %.2f EUR\n", CVA_300_cost);
 fprintf("Swap NPV with CVA (300 bps)  : %.2f EUR\n", NPV_300);
 fprintf("CVA (CDS = 500 bps)          : %.2f EUR\n", CVA_500);
+fprintf("CVA cost (CDS = 500 bps)     : %.2f EUR\n", CVA_500_cost);
 fprintf("Swap NPV with CVA (500 bps)  : %.2f EUR\n\n", NPV_500);
 
 %% task 4
