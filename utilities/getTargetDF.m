@@ -17,7 +17,10 @@ targetTenors = yearfrac(evalDate, targetDates, 3);
 
 % Linear interpolation of zero rates at target tenors
 % interp1 with 'linear' and 'extrap' handles flat extrapolation implicitly
-interpRates = interp1(pillarTenors, zeroRates, targetTenors, 'linear', 'extrap');
+% Linear interpolation in-range + flat extrapolation out-of-range
+interpRates = interp1(pillarTenors, zeroRates, targetTenors, 'linear', NaN);
+interpRates(targetTenors <= pillarTenors(1)) = zeroRates(1);   % flat short-end
+interpRates(targetTenors >= pillarTenors(end)) = zeroRates(end); % flat long-end
 
 discounts = exp(-interpRates .* targetTenors);
 

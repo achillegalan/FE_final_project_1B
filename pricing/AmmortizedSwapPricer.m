@@ -1,7 +1,14 @@
 function [swapPrice, fixedPrice, floatingPrice] = AmmortizedSwapPricer(paymentDates, ...
-    curveDates, pseudocurveDates, ammortizedNotional,zeroRates, pseudozeroRates, fixedRate, settleDate)
+    curveDates, pseudocurveDates, ammortizedNotional,zeroRates, pseudozeroRates, fixedRate, settleDate, resetType)
 
 %COMMENT: Thanks to God the payment dates for both legs are the same ;)
+%COMMENT: i will comment better in the docstring, but this filtering of
+%pseudodiscounts comes from the annex
+
+% reset day is by default quarterly
+if nargin < 9 || isempty(resetType)
+    resetType = 'quarterly';
+end
 
 % Computing yearfracs tenors
 allDates = [settleDate; paymentDates];
@@ -11,40 +18,30 @@ yearfracs = yearfrac(allDates(1:end-1), allDates(2:end), 2); %Act/360 (look anne
 discounts = getTargetDF(settleDate, curveDates, zeroRates, paymentDates);
 pseudodiscounts = getTargetDF(settleDate, pseudocurveDates, pseudozeroRates, paymentDates);
 
-% Fixed Leg Price
+%% Fixed Leg Price
 fixedCashFlows = yearfracs .* fixedRate .* ammortizedNotional;
 fixedPrice = dot(fixedCashFlows, discounts);
 
-% Floating Leg Price
-
-%COMMENT: i will comment better in the docstring, but this filtering of
-%pseudodiscounts comes from the annex
-%(RMK: Reset Dates: 2 BD prior to each semiannually calculation start date)
-% ==> "semiannualy" fixing is the reason
-% BUT ASK TO LOCATELLI
-
-%COMMENT: rememeber that MATLAB handles this perfectly using end, even if
-%the last element is not, for example, in an odd index
-%(same for even indices)
-
+%% Floating Leg Price
 % Get fwd pseudoscounts from the spot interpolated ones
 pseudodiscountsFull = [1; pseudodiscounts];
 pseudoFwdRates = (pseudodiscountsFull(1:end-1) ./ pseudodiscountsFull(2:end) - 1) ./ yearfracs;
-floatingLegfwdRates = pseudoFwdRates(1:2:end);
 
-yearfracsEvenTenors = yearfracs(2:2:end);
-ammortizedNotionalEven = ammortizedNotional(2:2:end);
-discountsEvenTenors = discounts(2:2:end);
+resetType = lower(string(resetType));
+switch resetType
+    case "quarterly"
+        appliedFwdRates = pseudoFwdRates;
+    case "semiannual"
+        nPeriods = numel(pseudoFwdRates);
+        pairStartIdx = 2 * ceil((1:nPeriods)' / 2) - 1; % 1,1,3,3,...
+        appliedFwdRates = pseudoFwdRates(pairStartIdx);
+    otherwise
+        error('AmmortizedSwapPricer:InvalidResetType', ...
+            'resetType must be ''quarterly'' or ''semiannual''.');
+end
 
-yearfracsOddTenors = yearfracs(1:2:end);
-ammortizedNotionalOdd = ammortizedNotional(1:2:end);
-discountsOddTenors = discounts(1:2:end);
-
-
-floatingPrice = dot(discountsOddTenors .* floatingLegfwdRates .* ...
-                yearfracsOddTenors, ammortizedNotionalOdd) ...
-                + dot(discountsEvenTenors .* floatingLegfwdRates .* ...
-                yearfracsEvenTenors, ammortizedNotionalEven);
+floatingCashFlows = appliedFwdRates .* yearfracs .* ammortizedNotional;
+floatingPrice = dot(floatingCashFlows, discounts);
 
 swapPrice = floatingPrice - fixedPrice;
 

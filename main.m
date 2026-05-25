@@ -49,18 +49,18 @@ EUR3M_Boot_2 = bootstrapCrab3M(EUR3M_Curve_2, OIS_Boot_2, settlementDate_2, true
 %disp(EUR3M_Boot_2.table)
 
 %% Plot: OIS discount curve 2022 vs 2023 (MA ANCHE DA TOGLIERE)
-tau22 = yearfrac(settlementDate, OIS_Boot.dates, 3);
-tau23 = yearfrac(settlementDate_2, OIS_Boot_2.dates, 3);
+% tau22 = yearfrac(settlementDate, OIS_Boot.dates, 3);
+% tau23 = yearfrac(settlementDate_2, OIS_Boot_2.dates, 3);
 
-figure;
-plot(tau22, OIS_Boot.discounts, '-o', 'LineWidth', 1.3, 'DisplayName', 'OIS 2022');
-hold on;
-plot(tau23, OIS_Boot_2.discounts, '-s', 'LineWidth', 1.3, 'DisplayName', 'OIS 2023');
-grid on;
-xlabel('Maturity (years)');
-ylabel('Discount Factor');
-title('OIS Discount Curves: 2022 vs 2023');
-legend('Location','best');
+% figure;
+% plot(tau22, OIS_Boot.discounts, '-o', 'LineWidth', 1.3, 'DisplayName', 'OIS 2022');
+% hold on;
+% plot(tau23, OIS_Boot_2.discounts, '-s', 'LineWidth', 1.3, 'DisplayName', 'OIS 2023');
+% grid on;
+% xlabel('Maturity (years)');
+% ylabel('Discount Factor');
+% title('OIS Discount Curves: 2022 vs 2023');
+% legend('Location','best');
 
 
 %% task 2: NPV_riskfree Ammortized Swap
@@ -78,12 +78,14 @@ fixedRate = 0.0221;
 % tutta questa parte è identica a  una riga sotto
 payments_dates_adjusted = swapData.PayDate;
 
-
 curveDates = OIS_Boot.dates;
 pseudocurveDates = EUR3M_Boot.dates;
 
 %%
-swap = AmmortizedSwapPricer(payments_dates_adjusted, curveDates, pseudocurveDates, ...
+swap_quarterly = AmmortizedSwapPricer(payments_dates_adjusted, curveDates, pseudocurveDates, ...
     swapData.Notional, OIS_Boot.zeroRates, EUR3M_Boot.zeroRates, fixedRate, ...
-    settlementDate);
-disp(swap)
+    settlementDate)
+swap_semiannual = AmmortizedSwapPricer(payments_dates_adjusted, curveDates, pseudocurveDates, ...
+    swapData.Notional, OIS_Boot.zeroRates, EUR3M_Boot.zeroRates, fixedRate, ...
+    settlementDate, 'semiannual')  
+
