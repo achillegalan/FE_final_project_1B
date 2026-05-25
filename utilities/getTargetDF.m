@@ -5,23 +5,36 @@ function discounts = getTargetDF(evalDate, curveDates, zeroRates, targetDates)
 % INPUTS:
 %   evalDate   : settlement/evaluation date (scalar)
 %   curveDates : curve pillar dates (Nx1)
-%   zeroRates  : zero rates at pillar dates (Nx1), Act/360 convention
+%   zeroRates  : continuously-compounded zero rates at pillar dates (Nx1),
+%                expressed on ACT/365 tenors from evalDate
 %   targetDates: dates where we want discount factors (Mx1)
 %
 % OUTPUT:
 %   discounts  : discount factors at targetDates (Mx1)
 
-% Yearfracs from evalDate to curve pillars and target dates (Act/365) 
+curveDates = curveDates(:);
+zeroRates = zeroRates(:);
+targetDates = targetDates(:);
+
+% Year fractions from evalDate to curve pillars and target dates (ACT/365)
 pillarTenors = yearfrac(evalDate, curveDates, 3);
 targetTenors = yearfrac(evalDate, targetDates, 3);
 
-% Linear interpolation of zero rates at target tenors
-% interp1 with 'linear' and 'extrap' handles flat extrapolation implicitly
-% Linear interpolation in-range + flat extrapolation out-of-range
-interpRates = interp1(pillarTenors, zeroRates, targetTenors, 'linear', NaN);
-interpRates(targetTenors <= pillarTenors(1)) = zeroRates(1);   % flat short-end
-interpRates(targetTenors >= pillarTenors(end)) = zeroRates(end); % flat long-end
+% Drop invalid pillar nodes (e.g., NaN zero-rate at settlement tenor = 0).
+valid = isfinite(pillarTenors) & isfinite(zeroRates);
+pillarTenors = pillarTenors(valid);
+pillarRates = zeroRates(valid);
+
+% Linear interpolation in-range + flat extrapolation out-of-range.
+if numel(pillarTenors) == 1
+    interpRates = repmat(pillarRates, size(targetTenors));
+else
+    interpRates = interp1(pillarTenors, pillarRates, targetTenors, 'linear', NaN);
+    interpRates(targetTenors <= pillarTenors(1)) = pillarRates(1);   % flat short-end
+    interpRates(targetTenors >= pillarTenors(end)) = pillarRates(end); % flat long-end
+end
 
 discounts = exp(-interpRates .* targetTenors);
+discounts(targetTenors == 0) = 1.0;
 
 end

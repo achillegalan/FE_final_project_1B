@@ -66,25 +66,19 @@ tau23 = yearfrac(settlementDate_2, OIS_Boot_2.dates, 3);
 %% task 2: NPV_riskfree Ammortized Swap
 fixedRate = 0.0221;
 
-%COMMENT: settledate computed as before leads to 28th, so good
-% maturityYears = 15; paymentsPerYear = 4; 
-% totalPeriods = maturityYears * paymentsPerYear;
-% monthIncrements = calmonths(3 * (1:totalPeriods)');
+swap_quarterly = AmmortizedSwapPricer( ...
+    swapData, OIS_Boot, EUR3M_Boot, settlementDate, fixedRate, 'quarterly', []);
 
-% payments_dates = settlementDate + monthIncrements;
-% payments_dates_adjusted = modifiedFollowing(payments_dates);
-% tutta questa parte è identica a  una riga sotto
-payments_dates_adjusted = swapData.PayDate;
+swap_semiannual = AmmortizedSwapPricer( ...
+    swapData, OIS_Boot, EUR3M_Boot, settlementDate, fixedRate, 'semiannual', []);
+fprintf("Swap price from Bank perspective (MtM) [reset: quarterly] is: %.2f EUR\n", swap_quarterly);
+fprintf("Swap price from Bank perspective (MtM) [reset: semiannual] is: %.2f EUR\n", swap_semiannual);
 
-curveDates = OIS_Boot.dates;
-pseudocurveDates = EUR3M_Boot.dates;
 
-%%
-swap_quarterly = AmmortizedSwapPricer(payments_dates_adjusted, curveDates, pseudocurveDates, ...
-    swapData.Notional, OIS_Boot.zeroRates, EUR3M_Boot.zeroRates, fixedRate, ...
-    settlementDate)
-swap_semiannual = AmmortizedSwapPricer(payments_dates_adjusted, curveDates, pseudocurveDates, ...
-    swapData.Notional, OIS_Boot.zeroRates, EUR3M_Boot.zeroRates, fixedRate, ...
-    settlementDate, 'semiannual')  
-fprintf("Swap price from Bank perspective (MtM) is: %.2f EUR\n", swap);
+%% task 4
+% DA CONTROLLARE SU INTERNET IL RATE!!!!!!!!!!!!!!!!!!!!!!!!
+knownFixing = struct('resetStartDate', datetime(2022,12,28), 'resetRate', 0.02202);
 
+swap_unwind = AmmortizedSwapPricer( ...
+    swapData, OIS_Boot_2, EUR3M_Boot_2, settlementDate_2, fixedRate, 'quarterly', knownFixing);
+fprintf("Swap price from Bank perspective (MtM) [reset: quarterly] is: %.2f EUR\n", swap_unwind);
