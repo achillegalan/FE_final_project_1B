@@ -1,6 +1,46 @@
-function price = bachelierPSSwaptionPricer( ...
+function price = bachelierPSSwaptionPricerCVA( ...
     OIS_curve, EUR3M_curve, paymentDates, strike, normalVol, exerciseDate, Notional, isPayer, fixingFrequency)
-%BACHELIERPSSWAPTIONPRICER Physical-settlement swaption under Bachelier.
+
+%BACHELIERPSSWAPTIONPRICERCVA Prices a physical-settlement amortizing swaption with Bachelier formula.
+%
+% INPUTS:
+%   OIS_curve         Struct containing the OIS discount curve.
+%                     Required fields:
+%                       - settlementDate
+%                       - dates
+%                       - zeroRates
+%
+%   EUR3M_curve       Struct containing the Euribor 3M pseudo-discount curve.
+%                     Required fields:
+%                       - dates
+%                       - zeroRates
+%
+%   paymentDates      Vector of swap payment dates.
+%
+%   strike            Fixed swap rate / swaption strike.
+%
+%   normalVol         Struct containing the Bachelier normal volatility surface.
+%                     Required fields:
+%                       - expiriesNum      numeric expiries in years
+%                       - tenorsNum        numeric tenors in years
+%                       - matrixDecimal    normal vol matrix in decimal units
+%                                          e.g. 80 bps = 0.0080
+%
+%   exerciseDate      Swaption exercise date.
+%
+%   Notional          Vector of amortizing notionals associated with paymentDates.
+%
+%   isPayer           Boolean flag.
+%                     true  -> payer swaption
+%                     false -> receiver swaption
+%
+%   fixingFrequency   String specifying the floating reset rule:
+%                     - 'quarterly'
+%                     - 'semiannual'
+%
+% OUTPUT:
+%   price             Swaption price in currency units.
+
 
 settleDate = OIS_curve.settlementDate;
 
