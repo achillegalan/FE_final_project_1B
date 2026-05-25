@@ -80,7 +80,12 @@ normalVol = loadSwaptionVols();
 
 % Extracting payment dates and notionals reliably
 paymentDates = swapData.PayDate;
-Notional = swapData.Notional;
+
+try
+    Notional = swapData.Notional;
+catch
+    Notional = swapData{:, 5}; % Fallback
+end
 
 strike = fixedRate;
 % Bank receives Euribor 3M, pays 2.21%. 

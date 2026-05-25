@@ -60,7 +60,7 @@ ammortizedFwdSwapRate = floatingLegFwdValue / ammortizedBPV;
 
 volsAtExpiry = interp1(normalVol.expiriesNum, normalVol.matrixDecimal, TTM, 'linear');
 maxTenor = max(normalVol.tenorsNum); % Max is typically 30Y
-vanillaPaymentDates = zeros(maxTenor, 1);
+vanillaPaymentDates = NaT(maxTenor, 1);
 
 for y = 1:maxTenor
     vanillaPaymentDates(y) = add_target_months(exerciseDate, 12 * y, 'modifiedfollow');
