@@ -1,5 +1,6 @@
 function diagData = buildDiagonalSwaptionMarketData( ...
     OIS_curve, EUR3M_curve, diagSwaptionsTable, isPayer, fixingFrequency)
+    
 %BUILDDIAGONALSWAPTIONMARKETDATA
 % Build market dataset on diagonal swaptions:
 % (1y15y, 3y12y, 5y10y, 8y7y, 10y5y, 12y3y, 15y1y).
@@ -24,47 +25,43 @@ function diagData = buildDiagonalSwaptionMarketData( ...
     n = height(diagSwaptionsTable);
     settlementDate = OIS_curve.settlementDate;
 
-    expiryYears   = zeros(n,1);
-    tenorYears    = zeros(n,1);
-    volBps        = zeros(n,1);
-    volSwap       = zeros(n,1);
+    % Vectorized parsing of diagonal labels and market normal vols
+    expiryYears = str2double(erase(lower(string(diagSwaptionsTable.Expiry(:))), "y"));
+    tenorYears  = str2double(erase(lower(string(diagSwaptionsTable.Tenor(:))),  "y"));
+    volSwap     = diagSwaptionsTable.NormalVol_bps(:) ./ 10000.0;
+
+    % Vectorized computation of option expiry and underlying swap maturity
+    expiryDates = arrayfun(@(y) add_target_months(settlementDate, round(12 * y), 'modifiedfollow'), expiryYears);
+    maturityDates = arrayfun(@(e,t) add_target_months(e, round(12 * t), 'modifiedfollow'), expiryDates, tenorYears);
+
     strikeATM     = zeros(n,1);
     annuityFwd    = zeros(n,1);
     dfExpiry      = zeros(n,1);
     marketPrice   = zeros(n,1);
 
-    % Loop on each swaption
+    % Loop only where full vectorization is not practical:
+    % each swaption has its own coupon schedule length.
     for i = 1:n
-        % Get expiry, tenor, market normal vol
-        expiryYears(i) = str2double(erase(lower(string(diagSwaptionsTable.Expiry(i))), "y"));
-        tenorYears(i)  = str2double(erase(lower(string(diagSwaptionsTable.Tenor(i))),  "y"));
-        volBps(i) = diagSwaptionsTable.NormalVol_bps(i);
-        volSwap(i) = volBps(i) / 10000.0;
-
-        expiryDate = add_target_months(settlementDate, round(12 * expiryYears(i)), 'modifiedfollow');
-        maturityDate = add_target_months(expiryDate, round(12 * tenorYears(i)), 'modifiedfollow');
-
         % Underlying swap schedule: start at option expiry, quarterly coupons.
-        sched = makeSchedule(expiryDate, maturityDate, 3, 'modifiedfollow');
+        sched = makeSchedule(expiryDates(i), maturityDates(i), 3, 'modifiedfollow');
         paymentDates = sched(2:end);                      % remove start date
         notionals = ones(numel(paymentDates), 1);         % unit notional (calibration scale)
 
-        % 1) extract ATM forward quantities (S0, A, P0T)
-        [~, qATM] = bachelierPSSwaptionPricerDiagonal( ...
-            OIS_curve, EUR3M_curve, paymentDates, 0.0, 1e-8, ...
+        % Extract ATM forward quantities (S0, A, P0T) from curves.
+        [~, qATM] = bachelierPSSwaptionPricer_modificata_per_pt5( ...
+            OIS_curve, EUR3M_curve, paymentDates, 0.0, 0.0, ...
             expiryYears(i), notionals, isPayer, fixingFrequency);
 
-        K = qATM.forwardSwapRate;                         % ATM strike
-
-        % 2) market price from market normal vol (Bachelier)
-        [pmkt, qMkt] = bachelierPSSwaptionPricerDiagonal( ...
-            OIS_curve, EUR3M_curve, paymentDates, K, volSwap(i), ...
-            expiryYears(i), notionals, isPayer, fixingFrequency);
+        K = qATM.forwardSwapRate;                         % ATM strike K = S0
 
         strikeATM(i) = K;
-        annuityFwd(i) = qMkt.annuityFwd;
-        dfExpiry(i) = qMkt.optionDiscount;
-        marketPrice(i) = pmkt;
+        annuityFwd(i) = qATM.annuityFwd;
+        dfExpiry(i) = qATM.optionDiscount;
+
+        % ATM Bachelier price:
+        % V_ATM = P(0,T) * A_fwd(0) * sigma_N * sqrt(T) / sqrt(2*pi)
+        marketPrice(i) = dfExpiry(i) * annuityFwd(i) * volSwap(i) * ...
+            sqrt(expiryYears(i)) / sqrt(2*pi);
     end
 
     summary = table( expiryYears, tenorYears, volSwap, ...

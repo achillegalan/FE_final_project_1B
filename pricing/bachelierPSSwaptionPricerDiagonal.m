@@ -1,26 +1,38 @@
-function [price, details] = bachelierPSSwaptionPricer_modificata_per_pt5( ...
+function [price, details] = bachelierPSSwaptionPricerDiagonal( ...
     OIS_curve, EUR3M_curve, paymentDates, strike, normalVol, TTM, Notional, isPayer, fixingFrequency)
-%BACHELIERPSSWAPTIONPRICER Physical-settlement swaption under Bachelier.
-%
-% Price formula (normal model):
-%   V0 = P(0,Texp)*A_fwd(0) * [ w*(S0-K)*N(w*d) + sigmaN*sqrt(Texp)*phi(d) ]
-% where w=+1 payer, w=-1 receiver, d=(S0-K)/(sigmaN*sqrt(Texp)).
+
+%BACHELIERPSSWAPTIONPRICERDIAGONAL Prices a physical-settlement swaption with Bachelier formula.
 %
 % INPUTS:
-%   OIS_curve       struct with fields: settlementDate, dates, zeroRates
-%   EUR3M_curve     struct with fields: dates, zeroRates
-%   paymentDates    payment dates of underlying swap (column/row vector)
-%   strike          fixed rate K
-%   normalVol       Bachelier normal vol (decimal, e.g. 80 bps = 0.0080)
-%   TTM             option expiry in years (from settlementDate)
-%   Notional        notionals (same length as paymentDates)
-%   isPayer         true= payer (call), false= receiver (put)
-%   fixingFrequency 'quarterly' or 'semiannual' (also accepts logical:
-%                   true=semiannual, false=quarterly)
+%   - OIS_curve         Struct containing the OIS discount curve.
+%                       Required fields: settlementDate, dates, zeroRates
+%   - EUR3M_curve       Struct containing the Euribor 3M pseudo-discount curve.
+%                       Required field: dates, zeroRates
+%
+%   - paymentDates      Vector of underlying swap payment dates.
+%   - strike            Fixed swap rate / swaption strike.
+%   - normalVol         Bachelier normal volatility in decimal units.
+%   - TTM               Time to maturity / option expiry in years.
+%   - Notional          Vector of amortizing notionals associated with paymentDates.
+%
+%   - isPayer           Optional boolean flag:  true  -> payer swaption (default)
+%                                               false -> receiver swaption
+%   - fixingFrequency   Optional string specifying the floating reset rule:"quarterly" (default), "semiannual"
 %
 % OUTPUTS:
-%   price           time-0 swaption price
-%   details         struct with forward quantities used in pricing
+%   - price             Swaption price in currency units, scaled by the remaining notional convention used inside the function.
+%
+%   - details           Struct containing intermediate quantities:
+%                       - exerciseDate
+%                       - remainingNotional
+%                       - yearFracs
+%                       - optionDiscount
+%                       - annuityFwd
+%                       - forwardSwapRate
+%                       - strike
+%                       - normalVol
+%                       - stdDev
+
 
     if nargin < 8 || isempty(isPayer)
         isPayer = true;
