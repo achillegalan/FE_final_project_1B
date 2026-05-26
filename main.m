@@ -62,12 +62,12 @@ EUR3M_Boot_2 = bootstrapCrab3M(EUR3M_Curve_2, OIS_Boot_2, settlementDate_2, true
 %% task 2: NPV_riskfree Ammortized Swap
 disp('\n=== Task 2: NPV risk-free 2022 ===\n')
 fixedRate = 0.0221;
-swap2022_quarterly = AmmortizedSwapPricer( ...
+swap_quarterly = AmmortizedSwapPricer( ...
     swapData, OIS_Boot, EUR3M_Boot, settlementDate, fixedRate, 'quarterly', []);
-swap2022_semiannual = AmmortizedSwapPricer( ...
+swap_semiannual = AmmortizedSwapPricer( ...
     swapData, OIS_Boot, EUR3M_Boot, settlementDate, fixedRate, 'semiannual', []);
-fprintf("Swap price from Bank perspective (MtM) [reset: quarterly] is: %.2f EUR\n", swap2022_quarterly);
-fprintf("Swap price from Bank perspective (MtM) [reset: semiannual] is: %.2f EUR\n", swap2022_semiannual);
+fprintf("Swap price from Bank perspective (MtM) [reset: quarterly] is: %.2f EUR\n", swap_quarterly);
+fprintf("Swap price from Bank perspective (MtM) [reset: semiannual] is: %.2f EUR\n", swap_semiannual);
 %% Task 3: Amortizing Swap Pricing with CVA: simplified approach
 disp('\n=== Task 3: CVA Computation 2022 ===\n')
 
@@ -97,8 +97,8 @@ cdsSpreads_500 = 0.05;
 [CVA_500_cost, survProbs_500_cost] = computeCVAConstantLambda( ...
      swapData,OIS_Boot, EUR3M_Boot, settlementDate, strike, normalVol, ...
      isPayer, fixingFrequency, cdsSpreads_500, LGD);    
-NPV_300 = swap2022_quarterly - CVA_300;
-NPV_500 = swap2022_quarterly - CVA_500;
+NPV_300 = swap_quarterly - CVA_300;
+NPV_500 = swap_quarterly - CVA_500;
 
 fprintf("CVA (CDS = 300 bps)          : %.2f EUR\n", CVA_300);
 fprintf("CVA cost (CDS = 300 bps)     : %.2f EUR\n", CVA_300_cost);
