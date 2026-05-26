@@ -62,30 +62,23 @@ EUR3M_Boot_2 = bootstrapCrab3M(EUR3M_Curve_2, OIS_Boot_2, settlementDate_2, true
 % title('OIS Discount Curves: 2022 vs 2023');
 % legend('Location','best');
 
-
 %% task 2: NPV_riskfree Ammortized Swap
+disp('\n=== Task 2: NPV risk-free 2022 ===\n')
 fixedRate = 0.0221;
-
-swap_quarterly = AmmortizedSwapPricer( ...
+swap2022_quarterly = AmmortizedSwapPricer( ...
     swapData, OIS_Boot, EUR3M_Boot, settlementDate, fixedRate, 'quarterly', []);
-
-swap_semiannual = AmmortizedSwapPricer( ...
+swap2022_semiannual = AmmortizedSwapPricer( ...
     swapData, OIS_Boot, EUR3M_Boot, settlementDate, fixedRate, 'semiannual', []);
 fprintf("Swap price from Bank perspective (MtM) [reset: quarterly] is: %.2f EUR\n", swap_quarterly);
 fprintf("Swap price from Bank perspective (MtM) [reset: semiannual] is: %.2f EUR\n", swap_semiannual);
 %% Task 3: Amortizing Swap Pricing with CVA: simplified approach
-disp('=== Task 3: CVA Computation ===')
+disp('\n=== Task 3: CVA Computation 2022 ===\n')
 
 normalVol = loadSwaptionVols();
 
 % Extracting payment dates and notionals reliably
 paymentDates = swapData.PayDate;
-
-try
-    Notional = swapData.Notional;
-catch
-    Notional = swapData{:, 5}; % Fallback
-end
+Notional = swapData.Notional;
 
 strike = fixedRate;
 % Bank receives Euribor 3M, pays 2.21%. 
@@ -100,22 +93,29 @@ cdsSpreads_300 = 0.03;
 [CVA_300, survProbs_300] = computeCVA( ...
     OIS_Boot, EUR3M_Boot, paymentDates, strike, normalVol, Notional, ...
     isPayer, fixingFrequency, cdsSpreads_300, LGD);
-    
+[CVA_300_cost, survProbs_300_cost] = computeCVAConstantLambda( ...
+     OIS_Boot, EUR3M_Boot, paymentDates, strike, normalVol, Notional, ...
+     isPayer, fixingFrequency, cdsSpreads_300, LGD);    
 % Scenario 2: CDS Spread = 500 bps
 cdsSpreads_500 = 0.05; 
 [CVA_500, survProbs_500] = computeCVA( ...
     OIS_Boot, EUR3M_Boot, paymentDates, strike, normalVol, Notional, ...
     isPayer, fixingFrequency, cdsSpreads_500, LGD);
-    
+[CVA_500_cost, survProbs_500_cost] = computeCVAConstantLambda( ...
+     OIS_Boot, EUR3M_Boot, paymentDates, strike, normalVol, Notional, ...
+     isPayer, fixingFrequency, cdsSpreads_500, LGD);    
 NPV_300 = swap_quarterly - CVA_300;
 NPV_500 = swap_quarterly - CVA_500;
 
 fprintf("CVA (CDS = 300 bps)          : %.2f EUR\n", CVA_300);
+fprintf("CVA cost (CDS = 300 bps)     : %.2f EUR\n", CVA_300_cost);
 fprintf("Swap NPV with CVA (300 bps)  : %.2f EUR\n", NPV_300);
 fprintf("CVA (CDS = 500 bps)          : %.2f EUR\n", CVA_500);
+fprintf("CVA cost (CDS = 500 bps)     : %.2f EUR\n", CVA_500_cost);
 fprintf("Swap NPV with CVA (500 bps)  : %.2f EUR\n\n", NPV_500);
 
 %% task 4
+disp('=== Task 4: CVA Computation 2023 ===')
 % the rate is taken by ...
 knownFixing = struct('resetStartDate', datetime(2022,12,28), 'resetRate', 0.02202);
 

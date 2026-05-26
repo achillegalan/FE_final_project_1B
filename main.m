@@ -17,8 +17,7 @@ addpath('pricing')
 refDate = datetime(2022, 6, 26);
 settlementDate = add_target_business_days(refDate, 2);
 curveFile  = fullfile('data', '20220626_Curve.xlsx');  
-curveColumns  = {'Term', 'Market Rate'};
-
+curveColumns = {'Term', 'Market Rate'};
 OIS_Curve = importExcellData(curveFile, 'OIS ESTR Curve', curveColumns);
 EUR3M_Curve = importExcellData(curveFile, '3MCurve', curveColumns);
 
@@ -26,8 +25,6 @@ EUR3M_Curve = importExcellData(curveFile, '3MCurve', curveColumns);
 refDate_2 = datetime(2023, 1, 31);
 settlementDate_2 = add_target_business_days(refDate_2, 2);
 curveFile_2  = fullfile('data', '20230131_Curve.xlsx');  
-curveColumns  = {'Term', 'Market Rate'};
-
 OIS_Curve_2   = importExcellData(curveFile_2, 'Curva OIS 31 Jan', curveColumns);
 EUR3M_Curve_2 = importExcellData(curveFile_2, 'Curve 3M 31 Jan',  curveColumns);
 
@@ -62,19 +59,17 @@ EUR3M_Boot_2 = bootstrapCrab3M(EUR3M_Curve_2, OIS_Boot_2, settlementDate_2, true
 % title('OIS Discount Curves: 2022 vs 2023');
 % legend('Location','best');
 
-
 %% task 2: NPV_riskfree Ammortized Swap
+disp('\n=== Task 2: NPV risk-free 2022 ===\n')
 fixedRate = 0.0221;
-
-swap_quarterly = AmmortizedSwapPricer( ...
+swap2022_quarterly = AmmortizedSwapPricer( ...
     swapData, OIS_Boot, EUR3M_Boot, settlementDate, fixedRate, 'quarterly', []);
-
-swap_semiannual = AmmortizedSwapPricer( ...
+swap2022_semiannual = AmmortizedSwapPricer( ...
     swapData, OIS_Boot, EUR3M_Boot, settlementDate, fixedRate, 'semiannual', []);
-fprintf("Swap price from Bank perspective (MtM) [reset: quarterly] is: %.2f EUR\n", swap_quarterly);
-fprintf("Swap price from Bank perspective (MtM) [reset: semiannual] is: %.2f EUR\n", swap_semiannual);
+fprintf("Swap price from Bank perspective (MtM) [reset: quarterly] is: %.2f EUR\n", swap2022_quarterly);
+fprintf("Swap price from Bank perspective (MtM) [reset: semiannual] is: %.2f EUR\n", swap2022_semiannual);
 %% Task 3: Amortizing Swap Pricing with CVA: simplified approach
-disp('=== Task 3: CVA Computation ===')
+disp('\n=== Task 3: CVA Computation 2022 ===\n')
 
 normalVol = loadSwaptionVols();
 
@@ -106,8 +101,8 @@ cdsSpreads_500 = 0.05;
 [CVA_500_cost, survProbs_500_cost] = computeCVAConstantLambda( ...
      OIS_Boot, EUR3M_Boot, paymentDates, strike, normalVol, Notional, ...
      isPayer, fixingFrequency, cdsSpreads_500, LGD);    
-NPV_300 = swap_quarterly - CVA_300;
-NPV_500 = swap_quarterly - CVA_500;
+NPV_300 = swap2022_quarterly - CVA_300;
+NPV_500 = swap2022_quarterly - CVA_500;
 
 fprintf("CVA (CDS = 300 bps)          : %.2f EUR\n", CVA_300);
 fprintf("CVA cost (CDS = 300 bps)     : %.2f EUR\n", CVA_300_cost);
@@ -117,14 +112,15 @@ fprintf("CVA cost (CDS = 500 bps)     : %.2f EUR\n", CVA_500_cost);
 fprintf("Swap NPV with CVA (500 bps)  : %.2f EUR\n\n", NPV_500);
 
 %% task 4
+disp('\n=== Task 4: CVA Computation 2023 ===\n')
 % the rate is taken by ...
 knownFixing = struct('resetStartDate', datetime(2022,12,28), 'resetRate', 0.02202);
-
-swap_unwind = AmmortizedSwapPricer( ...
+swap2023_quarterly = AmmortizedSwapPricer( ...
     swapData, OIS_Boot_2, EUR3M_Boot_2, settlementDate_2, fixedRate, 'quarterly', knownFixing);
-fprintf("Swap price from Bank perspective (MtM) [reset: quarterly] is: %.2f EUR\n", swap_unwind);
+fprintf("Swap price from Bank perspective (MtM) [reset: quarterly] is: %.2f EUR\n", swap2023_quarterly);
 
 %% task 5
+disp('\n=== Task 5: Calibration Multicurve Swaption model ===\n')
 gammas = [0, 0.5, 1];
 
 diagSwaptions2022 = table( ...
