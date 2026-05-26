@@ -111,12 +111,6 @@ fprintf("Swap NPV with CVA (500 bps)  : %.2f EUR\n\n", NPV_500);
 disp('\n=== Task 4: CVA Computation 2023 ===\n')
 % the rate is taken by ...
 knownFixing = struct('resetStartDate', datetime(2022,12,28), 'resetRate', 0.02202);
-<<<<<<< HEAD
-swap2023_quarterly = AmmortizedSwapPricer( ...
-    swapData, OIS_Boot_2, EUR3M_Boot_2, settlementDate_2, fixedRate, 'quarterly', knownFixing);
-fprintf("Swap price from Bank perspective (MtM) [reset: quarterly] is: %.2f EUR\n", swap2023_quarterly);
-
-=======
 
 swap_unwind_quarterly = AmmortizedSwapPricer( ...
     swapData, OIS_Boot_2, EUR3M_Boot_2, settlementDate_2, fixedRate, 'quarterly', knownFixing);
@@ -140,7 +134,7 @@ fprintf("Unwind Swap NPV with CVA (300 bps)  : %.2f EUR\n", swap_unwind_quarterl
 
 fprintf("Unwind CVA (CDS = 500 bps)          : %.2f EUR\n", CVA_unwind_500);
 fprintf("Unwind Swap NPV with CVA (500 bps)  : %.2f EUR\n", swap_unwind_quarterly - CVA_unwind_500);
->>>>>>> eb497accd45873fbcbe4050f4a2acf47d15dfdcb
+
 %% task 5
 disp('\n=== Task 5: Calibration Multicurve Swaption model ===\n')
 gammas = [0, 0.5, 1];

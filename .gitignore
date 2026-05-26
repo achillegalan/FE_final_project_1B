@@ -1,0 +1,4 @@
+# MATLAB Git Ignore Rules
+*.asv
+*.mex*
+.matlab/
