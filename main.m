@@ -119,7 +119,7 @@ knownFixing = struct('resetStartDate', datetime(2022,12,28), 'resetRate', 0.0220
 swap_unwind_quarterly = AmmortizedSwapPricer( ...
     swapData, OIS_Boot_2, EUR3M_Boot_2, settlementDate_2, fixedRate, 'quarterly', knownFixing);
 swap_unwind_semiannual = AmmortizedSwapPricer( ...
-    swapData, OIS_Boot, EUR3M_Boot, settlementDate, fixedRate, 'semiannual', []);
+    swapData, OIS_Boot_2, EUR3M_Boot_2, settlementDate_2, fixedRate, 'semiannual', knownFixing);
 fprintf("Swap price from Bank perspective (MtM) [reset: quarterly] is: %.2f EUR\n", swap_unwind_quarterly);
 fprintf("Swap price from Bank perspective (MtM) [reset: semiannual] is: %.2f EUR\n", swap_unwind_semiannual);
 
