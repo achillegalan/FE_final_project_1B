@@ -152,19 +152,29 @@ diagSwaptions2023 = table( ...
 
 diagMkt2022 = buildDiagonalSwaptionMarketData(OIS_Boot, EUR3M_Boot, diagSwaptions2022, true);
 diagMkt2023 = buildDiagonalSwaptionMarketData(OIS_Boot_2, EUR3M_Boot_2, diagSwaptions2023, true);
-disp(diagMkt2022.summary)
-disp(diagMkt2023.summary)
+%disp(diagMkt2022.summary)
+%disp(diagMkt2023.summary)
 
 fprintf('\n-- Calibrazione MHW (min SSE prezzi) su diagonal swaptions --\n');
 
-[a22,b22,sse22,rmse22] = arrayfun(@(g) ...
-    calibrateMHWabDiagonal(OIS_Boot, EUR3M_Boot, diagMkt2022, g, true), gammas);
+for g = gammas
+    [a22, b22, cal22] = calibrateMHWabDiagonal(OIS_Boot, EUR3M_Boot, diagMkt2022, g, true);
+    [a23, b23, cal23] = calibrateMHWabDiagonal(OIS_Boot_2, EUR3M_Boot_2, diagMkt2023, g, true);
 
-[a23,b23,sse23,rmse23] = arrayfun(@(g) ...
-    calibrateMHWabDiagonal(OIS_Boot_2, EUR3M_Boot_2, diagMkt2023, g, true), gammas);
+    fprintf('\nGamma = %.2f\n', g);
+    fprintf('  2022 -> a = %.8f, b = %.8f, SSE = %.6e,\n ', ...
+        a22, b22, cal22.sse);
+    fprintf('  2023 -> a = %.8f, b = %.8f, SSE = %.6e,\n', ...
+        a23, b23, cal23.sse);
+end
+%% Landscape della funzione obiettivo (Task 5)
+% gammaPlot = 0.5;
+% % passata veloce
+% aVec = linspace(1e-3, 20, 50);
+% bVec = linspace(1e-3, 20, 50);
+% 
+% [A,B,SSE,minPoint] = plotMHWabObjectiveLandscape( ...
+%     OIS_Boot, EUR3M_Boot, diagMkt2022, 0.5, true, aVec, bVec);
 
-res = table(gammas(:), a22(:), b22(:), sse22(:), rmse22(:), ...
-                     a23(:), b23(:), sse23(:), rmse23(:), ...
-    'VariableNames', {'gamma','a22','b22','sse22','rmse22','a23','b23','sse23','rmse23'});
-
-disp(res)
+%fprintf('Grid min: a=%.6f, b=%.6f, SSE=%.6e\n', ...
+    %minPoint.a, minPoint.b, minPoint.sse);
