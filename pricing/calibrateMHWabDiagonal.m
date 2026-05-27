@@ -33,17 +33,9 @@ function [aCal, bCal, calib] = calibrateMHWabDiagonal( ...
     end
 
     % Initial guess
-    x0 = [0.10, 0.01];
+    x0 = [0.1, 0.1];
     
     mkt = diagData.summary;
-    requiredCols = {'ExpiryYears','TenorYears','StrikeATM','MarketPrice'};
-    for k = 1:numel(requiredCols)
-        if ~ismember(requiredCols{k}, mkt.Properties.VariableNames)
-            error('calibrateMHWabDiagonal:MissingColumn', ...
-                'Missing required column: %s.', requiredCols{k});
-        end
-    end
-
     expiryYears = mkt.ExpiryYears(:);
     tenorYears = mkt.TenorYears(:);
     strikeATM = mkt.StrikeATM(:);
@@ -59,8 +51,8 @@ function [aCal, bCal, calib] = calibrateMHWabDiagonal( ...
     opts = optimoptions('fmincon','Display','off','Algorithm','sqp', ...
         'StepTolerance',1e-9,'FunctionTolerance',1e-12, ...
         'MaxIterations',3000,'MaxFunctionEvaluations',10000);
-    
-    [xOpt, sseMin, exitflag, output] = fmincon(@objectiveAB, x0, [], [], [], [], lb, ub, [], opts);
+
+    [xOpt, sseMin] = fmincon(@objectiveAB, x0, [], [], [], [], lb, ub, [], opts);
     
     aCal = xOpt(1);
     bCal = xOpt(2);
@@ -71,8 +63,8 @@ function [aCal, bCal, calib] = calibrateMHWabDiagonal( ...
               'Model pricing failed at calibrated parameters.');
     end
 
-    absErrors = abs(modelPrices - marketPrices);
     residuals = modelPrices - marketPrices;
+    absErrors = abs(residuals);
     rmse = sqrt(mean(residuals.^2));
 
     resultsTable = table(expiryYears, tenorYears, strikeATM, marketPrices, ...
@@ -86,8 +78,6 @@ function [aCal, bCal, calib] = calibrateMHWabDiagonal( ...
     calib.gamma = gamma;
     calib.sse = sseMin;
     calib.rmse = rmse;
-    calib.exitflag = exitflag;
-    calib.output = output;
     calib.marketPrices = marketPrices;
     calib.modelPrices = modelPrices;
     calib.residuals = residuals;
@@ -107,7 +97,6 @@ function sse = objectiveAB(x)
 
     r = modelTry - marketPrices;
     sse = sum(r.^2);
-
     if ~isfinite(sse)
         sse = 1e30;
     end
@@ -121,12 +110,15 @@ function [modelVec, flag] = modelPricesFromParams(aTry, bTry)
         try
             exDate = add_target_months(settleDate, round(12 * expiryYears(i)), 'modifiedfollow');
             matDate = add_target_months(exDate, round(12 * tenorYears(i)), 'modifiedfollow');
-            sched = makeSchedule(exDate, matDate, 3, 'modifiedfollow');
-            payDates = sched(2:end);
+            % Task 5 convention: floating quarterly, fixed annual.
+            floatSched = makeSchedule(exDate, matDate, 3, 'modifiedfollow');
+            fixedSched = makeSchedule(exDate, matDate, 12, 'modifiedfollow');
+            floatPayDates = floatSched(2:end);
+            fixedPayDates = fixedSched(2:end);
 
             modelVec(i) = model_multiHJM_Price( ...
-                OIS_curve, EUR3M_curve, payDates, strikeATM(i), ...
-                expiryYears(i), aTry, bTry, gamma, isPayer);
+                OIS_curve, EUR3M_curve, floatPayDates, fixedPayDates, ...
+                strikeATM(i), expiryYears(i), aTry, bTry, gamma, isPayer);
         catch
             flag = false;
             return;
