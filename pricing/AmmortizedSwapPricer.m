@@ -39,48 +39,54 @@ zeroRates       = oisCurve.zeroRates(:);
 pseudocurveDates = pseudoCurve.dates(:);
 pseudozeroRates  = pseudoCurve.zeroRates(:);
 
-% al posto di queste righe quelle sotto
 knownDates = knownFixing.resetStartDate(:);
 knownRates = knownFixing.resetRate(:);
 
-% % Support both interfaces:
-% % - preferred: knownFixing.fixingDate
-% % - backward compatible: knownFixing.resetStartDate (converted to fixingDate = start-2bd)
-% if isfield(knownFixing, 'fixingDate')
-%     knownFixDates = knownFixing.fixingDate(:);
-% elseif isfield(knownFixing, 'resetStartDate')
-%     knownFixDates = arrayfun(@(d) add_target_business_days(d, -2), knownFixing.resetStartDate(:));
-% else
-%     knownFixDates = NaT(0,1);
-% end
-% knownRates = knownFixing.resetRate(:);
-
-%% Keep only future payment flows
-check = paymentDates > settlementDate;  
-payDates = paymentDates(check);
-accStart = accrualStartDates(check);
-accEnd = accrualEndDates(check);
-notional = ammortizedNotional(check);
-keptFullIdx = find(check);
-
-%% Map reset dates for kept coupons
+%% Map reset dates on the FULL schedule first
 resetType = lower(string(strtrim(resetType)));
+nCoupons = numel(paymentDates);
+fullIdx = (1:nCoupons).';
 
 switch resetType
     case "quarterly"
-        resetStart = accStart;
-        resetEnd = accEnd;
+        resetStartFull = accrualStartDates;
+        resetEndFull   = accrualEndDates;
 
     case "semiannual"
-        % Legacy: same 3M fixing of the first trimester of the couple
-        pairStartIdxFull = 2 * ceil(keptFullIdx / 2) - 1;   % 1,1,3,3,...
-        resetStart = accrualStartDates(pairStartIdxFull);
-        resetEnd = accrualEndDates(pairStartIdxFull);
+        % convention: (1,2), (3,4), ... share the first 3M fixing.
+        pairStartIdxFull = 2 * ceil(fullIdx / 2) - 1;   % 1,1,3,3,...
+        resetStartFull = accrualStartDates(pairStartIdxFull);
+        resetEndFull   = accrualEndDates(pairStartIdxFull);
 
     otherwise
         error('AmmortizedSwapPricer:InvalidResetType', ...
             'resetType must be ''quarterly'' or ''semiannual''.');
 end
+
+%% Build floating rates on the FULL schedule, then cut valuation-relevant cash flows
+floatingRatesFull = NaN(nCoupons, 1);
+
+for k = 1:nCoupons
+    if resetStartFull(k) < settlementDate
+        idxKnown = find(knownDates == resetStartFull(k), 1);
+        if ~isempty(idxKnown) && ~isnan(knownRates(idxKnown))
+            floatingRatesFull(k) = knownRates(idxKnown);
+        end
+    else
+        Pstart = getTargetDF(settlementDate, pseudocurveDates, pseudozeroRates, resetStartFull(k));
+        Pend   = getTargetDF(settlementDate, pseudocurveDates, pseudozeroRates, resetEndFull(k));
+        deltaReset = yearfrac(resetStartFull(k), resetEndFull(k), 2); % ACT/360 on reset period
+        floatingRatesFull(k) = (Pstart / Pend - 1) / deltaReset;
+    end
+end
+
+%% Keep only future payment flows
+check = paymentDates > settlementDate;
+payDates = paymentDates(check);
+accStart = accrualStartDates(check);
+accEnd = accrualEndDates(check);
+notional = ammortizedNotional(check);
+floatingRates = floatingRatesFull(check);
 
 %% Year fractions and discounting
 yearfracs = yearfrac(accStart, accEnd, 2); % ACT/360
@@ -89,43 +95,6 @@ discounts = getTargetDF(settlementDate, curveDates, zeroRates, payDates);
 %% Fixed leg
 fixedCashFlows = yearfracs .* fixedRate .* notional;
 fixedPrice = dot(fixedCashFlows, discounts);
-
-%% Floating leg
-floatingRates = zeros(size(yearfracs));
-
-% couponFixDates = arrayfun(@(d) add_target_business_days(d, -2), resetStart);
-
-for k = 1:numel(yearfracs)
-
-    % al posto di questa parte quella sotto
-    if resetStart(k) < settlementDate
-        % Coupon already fixed before valuation date -> use known historical fixing
-        idxKnown = find(knownDates == resetStart(k), 1);
-        floatingRates(k) = knownRates(idxKnown);
-    else
-        % Project from pseudo-curve
-        Pstart = getTargetDF(settlementDate, pseudocurveDates, pseudozeroRates, resetStart(k));
-        Pend   = getTargetDF(settlementDate, pseudocurveDates, pseudozeroRates, resetEnd(k));
-        deltaReset = yearfrac(resetStart(k), resetEnd(k), 2); % ACT/360 del periodo di reset
-        floatingRates(k) = (Pstart / Pend - 1) / deltaReset;
-    end
-
-    % if couponFixDates(k) <= settlementDate
-    %     idxKnown = find(knownFixDates == couponFixDates(k), 1);
-    %     if isempty(idxKnown)
-    %         error('AmmortizedSwapPricer:MissingKnownFixing', ...
-    %             'Missing known fixing for coupon %d (fixing date %s, reset start %s).', ...
-    %             k, datestr(couponFixDates(k)), datestr(resetStart(k)));
-    %     end
-    %     floatingRates(k) = knownRates(idxKnown);
-    % else
-    %     % Project from pseudo-curve
-    %     Pstart = getTargetDF(settlementDate, pseudocurveDates, pseudozeroRates, resetStart(k));
-    %     Pend   = getTargetDF(settlementDate, pseudocurveDates, pseudozeroRates, resetEnd(k));
-    %     deltaReset = yearfrac(resetStart(k), resetEnd(k), 2);
-    %     floatingRates(k) = (Pstart / Pend - 1) / deltaReset;
-    % end
-end
 
 floatingCashFlows = floatingRates .* yearfracs .* notional;
 floatingPrice = dot(floatingCashFlows, discounts);
