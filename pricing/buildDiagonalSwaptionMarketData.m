@@ -4,6 +4,9 @@ function diagData = buildDiagonalSwaptionMarketData( ...
 %BUILDDIAGONALSWAPTIONMARKETDATA
 % Build market dataset on diagonal swaptions:
 % (1y15y, 3y12y, 5y10y, 8y7y, 10y5y, 12y3y, 15y1y).
+% Convenzione usata per Task 5:
+%   - floating leg: quarterly (o come da fixingFrequency)
+%   - fixed leg: annual
 %
 % INPUT:
 %   OIS_curve, EUR3M_curve     curve structs
@@ -42,14 +45,21 @@ function diagData = buildDiagonalSwaptionMarketData( ...
     % Loop only where full vectorization is not practical:
     % each swaption has its own coupon schedule length.
     for i = 1:n
-        % Underlying swap schedule: start at option expiry, quarterly coupons.
-        sched = makeSchedule(expiryDates(i), maturityDates(i), 3, 'modifiedfollow');
-        paymentDates = sched(2:end);                      % remove start date
-        notionals = ones(numel(paymentDates), 1);         % unit notional (calibration scale)
+        % Underlying swap schedules: floating and fixed with distinct frequencies.
+        floatStepMonths = 3;
+        if fixingFrequency == "semiannual"
+            floatStepMonths = 6;
+        end
+        floatSched = makeSchedule(expiryDates(i), maturityDates(i), floatStepMonths, 'modifiedfollow');
+        fixedSched = makeSchedule(expiryDates(i), maturityDates(i), 12, 'modifiedfollow');
+
+        floatPaymentDates = floatSched(2:end);            % remove start date
+        fixedPaymentDates = fixedSched(2:end);            % remove start date
+        notionals = ones(numel(floatPaymentDates), 1);    % unit notional (calibration scale)
 
         % Extract ATM forward quantities (S0, A, P0T) from curves.
         [~, qATM] = bachelierPSSwaptionPricerDiagonal( ...
-            OIS_curve, EUR3M_curve, paymentDates, 0.0, 0.0, ...
+            OIS_curve, EUR3M_curve, floatPaymentDates, fixedPaymentDates, 0.0, 0.0, ...
             expiryYears(i), notionals, isPayer, fixingFrequency);
 
         K = qATM.forwardSwapRate;                         % ATM strike K = S0
