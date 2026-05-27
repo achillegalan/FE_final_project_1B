@@ -166,3 +166,4 @@ for g = gammas
     fprintf('  2023 -> a = %.8f, b = %.8f, SSE = %.6e,\n', ...
         a23, b23, cal23.sse);
 end
+%% task 6
