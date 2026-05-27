@@ -156,13 +156,15 @@ disp(diagMkt2022.summary)
 disp(diagMkt2023.summary)
 
 fprintf('\n-- Calibrazione MHW (min SSE prezzi) su diagonal swaptions --\n');
-for g = gammas
-    [a22, b22, sse22, rmse22] = calibrateMHWabDiagonal(OIS_Boot, EUR3M_Boot, diagMkt2022, g, true);
-    [a23, b23, sse23, rmse23] = calibrateMHWabDiagonal(OIS_Boot_2, EUR3M_Boot_2, diagMkt2023, g, true);
 
-    fprintf('\nGamma = %.2f\n', g);
-    fprintf('  2022 -> a = %.8f, b = %.8f, SSE = %.6e,\n ', ...
-        a22, b22, sse22);
-    fprintf('  2023 -> a = %.8f, b = %.8f, SSE = %.6e,\n', ...
-        a23, b23, sse23);
-end
+[a22,b22,sse22,rmse22] = arrayfun(@(g) ...
+    calibrateMHWabDiagonal(OIS_Boot, EUR3M_Boot, diagMkt2022, g, true), gammas);
+
+[a23,b23,sse23,rmse23] = arrayfun(@(g) ...
+    calibrateMHWabDiagonal(OIS_Boot_2, EUR3M_Boot_2, diagMkt2023, g, true), gammas);
+
+res = table(gammas(:), a22(:), b22(:), sse22(:), rmse22(:), ...
+                     a23(:), b23(:), sse23(:), rmse23(:), ...
+    'VariableNames', {'gamma','a22','b22','sse22','rmse22','a23','b23','sse23','rmse23'});
+
+disp(res)
