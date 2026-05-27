@@ -54,8 +54,8 @@ for n = 1:N
     objective = @(h) cdsObjective(h, s, LGD, payFracs, payDisc, ...
         knownSurvival, prevSurv, dt);
     
-    % Root-finding bounds to [0, 1] 
-    hazardRates(n) = fzero(objective, [0, 1]); 
+    % Root-finding bounds to [0, 50] 
+    hazardRates(n) = fzero(objective, [0, 50]); 
     survivalProbabilities(n) = prevSurv * exp(-hazardRates(n) * dt);
 end
 
