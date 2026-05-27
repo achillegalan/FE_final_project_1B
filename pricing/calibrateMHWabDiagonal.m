@@ -92,7 +92,7 @@ function [aCal, bCal, calib] = calibrateMHWabDiagonal( ...
     calib.modelPrices = modelPrices;
     calib.residuals = residuals;
     calib.resultsTable = resultsTable;
-end
+
 
 
 function sse = objectiveAB(x)
@@ -132,4 +132,8 @@ function [modelVec, flag] = modelPricesFromParams(aTry, bTry)
             return;
         end
     end
+end
+
+
+
 end
