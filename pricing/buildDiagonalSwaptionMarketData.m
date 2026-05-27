@@ -1,27 +1,23 @@
 function diagData = buildDiagonalSwaptionMarketData( ...
-    OIS_curve, EUR3M_curve, diagSwaptionsTable, isPayer, fixingFrequency)
+    OIS_curve, EUR3M_curve, diagSwaptionsTable, isPayer)
     
 %BUILDDIAGONALSWAPTIONMARKETDATA
 % Build market dataset on diagonal swaptions:
 % (1y15y, 3y12y, 5y10y, 8y7y, 10y5y, 12y3y, 15y1y).
 % Convenzione usata per Task 5:
-%   - floating leg: quarterly (o come da fixingFrequency)
+%   - floating leg: quarterly (fissa)
 %   - fixed leg: annual
 %
 % INPUT:
 %   OIS_curve, EUR3M_curve     curve structs
 %   diagSwaptionsTable         table with columns: Expiry, Tenor, NormalVol_bps
 %   isPayer                    true/false (default true)
-%   fixingFrequency            'quarterly'/'semiannual' (default quarterly)
 %
 % OUTPUT:
 %   diagData.summary           compact table with calibration inputs
 
     if nargin < 4 || isempty(isPayer)
         isPayer = true;
-    end
-    if nargin < 5 || isempty(fixingFrequency)
-        fixingFrequency = "quarterly";
     end
 
     % Preallocation
@@ -47,9 +43,6 @@ function diagData = buildDiagonalSwaptionMarketData( ...
     for i = 1:n
         % Underlying swap schedules: floating and fixed with distinct frequencies.
         floatStepMonths = 3;
-        if fixingFrequency == "semiannual"
-            floatStepMonths = 6;
-        end
         floatSched = makeSchedule(expiryDates(i), maturityDates(i), floatStepMonths, 'modifiedfollow');
         fixedSched = makeSchedule(expiryDates(i), maturityDates(i), 12, 'modifiedfollow');
 
@@ -60,7 +53,7 @@ function diagData = buildDiagonalSwaptionMarketData( ...
         % Extract ATM forward quantities (S0, A, P0T) from curves.
         [~, qATM] = bachelierPSSwaptionPricerDiagonal( ...
             OIS_curve, EUR3M_curve, floatPaymentDates, fixedPaymentDates, 0.0, 0.0, ...
-            expiryYears(i), notionals, isPayer, fixingFrequency);
+            expiryYears(i), notionals, isPayer, "quarterly");
 
         K = qATM.forwardSwapRate;                         % ATM strike K = S0
 

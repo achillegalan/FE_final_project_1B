@@ -33,8 +33,8 @@ diagSwaptions2023 = table( ...
     [95.95; 90.41; 84.93; 80.43; 78.77; 79.46; 79.97], ...
     'VariableNames', {'Expiry','Tenor','NormalVol_bps'});
 
-diagMkt2022 = buildDiagonalSwaptionMarketData(OIS_Boot, EUR3M_Boot, diagSwaptions2022, true, "quarterly");
-diagMkt2023 = buildDiagonalSwaptionMarketData(OIS_Boot_2, EUR3M_Boot_2, diagSwaptions2023, true, "quarterly");
+diagMkt2022 = buildDiagonalSwaptionMarketData(OIS_Boot, EUR3M_Boot, diagSwaptions2022, true);
+diagMkt2023 = buildDiagonalSwaptionMarketData(OIS_Boot_2, EUR3M_Boot_2, diagSwaptions2023, true);
 
 gammas = [0, 0.5, 1];
 for g = gammas
