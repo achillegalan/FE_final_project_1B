@@ -60,7 +60,7 @@ EUR3M_Boot_2 = bootstrapCrab3M(EUR3M_Curve_2, OIS_Boot_2, settlementDate_2, true
 % legend('Location','best');
 
 %% task 2: NPV_riskfree Ammortized Swap
-disp('\n=== Task 2: NPV risk-free 2022 ===\n')
+fprintf('=== Task 2: NPV risk-free 2022 ===\n\n')
 fixedRate = 0.0221;
 swap_quarterly = AmmortizedSwapPricer( ...
     swapData, OIS_Boot, EUR3M_Boot, settlementDate, fixedRate, 'quarterly', []);
@@ -69,7 +69,7 @@ swap_semiannual = AmmortizedSwapPricer( ...
 fprintf("Swap price from Bank perspective (MtM) [reset: quarterly] is: %.2f EUR\n", swap_quarterly);
 fprintf("Swap price from Bank perspective (MtM) [reset: semiannual] is: %.2f EUR\n", swap_semiannual);
 %% Task 3: Amortizing Swap Pricing with CVA: simplified approach
-disp('\n=== Task 3: CVA Computation 2022 ===\n')
+fprintf('\n=== Task 3: CVA Computation 2022 ===\n\n')
 
 normalVol = loadSwaptionVols();
 
@@ -108,7 +108,7 @@ fprintf("CVA cost (CDS = 500 bps)     : %.2f EUR\n", CVA_500_cost);
 fprintf("Swap NPV with CVA (500 bps)  : %.2f EUR\n\n", NPV_500);
 
 %% task 4
-disp('\n=== Task 4: CVA Computation 2023 ===\n')
+fprintf('\n=== Task 4: CVA Computation 2023 ===\n\n')
 % the rate is taken by ...
 knownFixing = struct('resetStartDate', datetime(2022,12,28), 'resetRate', 0.02202);
 
@@ -136,7 +136,7 @@ fprintf("Unwind CVA (CDS = 500 bps)          : %.2f EUR\n", CVA_unwind_500);
 fprintf("Unwind Swap NPV with CVA (500 bps)  : %.2f EUR\n", swap_unwind_quarterly - CVA_unwind_500);
 
 %% task 5
-disp('\n=== Task 5: Calibration Multicurve Swaption model ===\n')
+fprintf('\n=== Task 5: Calibration Multicurve Swaption model ===\n\n')
 gammas = [0, 0.5, 1];
 
 diagSwaptions2022 = table( ...
@@ -157,12 +157,12 @@ disp(diagMkt2023.summary)
 
 fprintf('\n-- Calibrazione MHW (min SSE prezzi) su diagonal swaptions --\n');
 for g = gammas
-    [a22, b22, cal22] = calibrateMHWabDiagonal(OIS_Boot, EUR3M_Boot, diagMkt2022, g, true);
-    [a23, b23, cal23] = calibrateMHWabDiagonal(OIS_Boot_2, EUR3M_Boot_2, diagMkt2023, g, true);
+    [a22, b22, sse22, rmse22] = calibrateMHWabDiagonal(OIS_Boot, EUR3M_Boot, diagMkt2022, g, true);
+    [a23, b23, sse23, rmse23] = calibrateMHWabDiagonal(OIS_Boot_2, EUR3M_Boot_2, diagMkt2023, g, true);
 
     fprintf('\nGamma = %.2f\n', g);
     fprintf('  2022 -> a = %.8f, b = %.8f, SSE = %.6e,\n ', ...
-        a22, b22, cal22.sse);
+        a22, b22, sse22);
     fprintf('  2023 -> a = %.8f, b = %.8f, SSE = %.6e,\n', ...
-        a23, b23, cal23.sse);
+        a23, b23, sse23);
 end

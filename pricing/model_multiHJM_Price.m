@@ -14,22 +14,9 @@ function [price, details] = model_multiHJM_Price( ...
     floatingPaymentDates = floatingPaymentDates(floatingPaymentDates > exerciseDate);
     fixedPaymentDates = fixedPaymentDates(fixedPaymentDates > exerciseDate);
 
-    if isempty(floatingPaymentDates) || isempty(fixedPaymentDates)
-        price = 0;
-        details = struct('exerciseDate', exerciseDate, 'xStar', NaN, 'receiverPrice', 0);
-        return;
-    end
-
-    [isFixedOnFloatGrid, fixedIdxOnFloat] = ismember(fixedPaymentDates, floatingPaymentDates);
-    if ~all(isFixedOnFloatGrid)
-        error('model_multiHJM_Price:FixedDatesNotOnFloatingGrid', ...
-            'Each fixed payment date must belong to the floating payment schedule.');
-    end
+   [~, fixedIdxOnFloat] = ismember(fixedPaymentDates, floatingPaymentDates);
 
     %% OIS CURVE
-    % Floating accruals ACT/360 and forward discounts B_{alpha,j}(t0)
-    floatAccrualStartDates = [exerciseDate; floatingPaymentDates(1:end-1)];
-    floatDelta = yearfrac(floatAccrualStartDates, floatingPaymentDates, 2);
 
     fixedAccrualStartDates = [exerciseDate; fixedPaymentDates(1:end-1)];
     fixedDelta = yearfrac(fixedAccrualStartDates, fixedPaymentDates, 2);
@@ -90,30 +77,11 @@ function [price, details] = model_multiHJM_Price( ...
              sum(A2 .* exp(-varsigma(1:end-1) * x)) - ...
              sum(A3 .* exp(-nu * x));
 
-    %% Bracket robusto per x*
-    L = -8; U = 8;
-    fL = f(L); fU = f(U);
-    it = 0;
-    while ~(fL > 0 && fU < 0) && it < 40
-        L = L - 4;
-        U = U + 4;
-        fL = f(L);
-        fU = f(U);
-        it = it + 1;
-    end
-
-    if ~(fL > 0 && fU < 0)
-        grid = linspace(-40, 40, 1601);
-        vals = arrayfun(f, grid);
-        k = find(vals(1:end-1) .* vals(2:end) <= 0, 1, 'first');
-        if isempty(k)
-            error('mhwPDSwaptionPricer:RootNotBracketed', ...
-                  'Unable to bracket x* for f(x)=0.');
-        end
-        xStar = fzero(f, [grid(k), grid(k+1)]);
-    else
-        xStar = fzero(f, [L, U]);
-    end
+    %% Bracket su griglia per x*
+    grid = linspace(-40, 40, 1601);
+    vals = arrayfun(f, grid);
+    k = find(vals(1:end-1) .* vals(2:end) <= 0, 1, 'first');
+    xStar = fzero(f, [grid(k), grid(k+1)]);
 
     %% Closed-form PD receiver price (eq. 3.11)
     Ncdf = @(z) 0.5 * erfc(-z / sqrt(2));
@@ -138,14 +106,4 @@ function [price, details] = model_multiHJM_Price( ...
     details.receiverPrice = receiverPrice;
     details.BPV0 = BPV0;
     details.num0 = num0;
-    details.discountToExpiry = P0T_alpha;
-    details.varsigma = varsigma;
-    details.nu = nu;
-    details.beta = beta;
-    details.Balpha_pay = Balpha_pay;
-    details.floatingPaymentDates = floatingPaymentDates;
-    details.fixedPaymentDates = fixedPaymentDates;
-    details.floatDelta = floatDelta;
-    details.fixedDelta = fixedDelta;
-    details.fixedIdxOnFloat = fixedIdxOnFloat;
 end

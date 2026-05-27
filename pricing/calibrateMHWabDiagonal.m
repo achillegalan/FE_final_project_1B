@@ -1,4 +1,4 @@
-function [aCal, bCal, calib] = calibrateMHWabDiagonal( ...
+function [aCal, bCal, sseMin, rmse] = calibrateMHWabDiagonal( ...
     OIS_curve, EUR3M_curve, diagData, gamma, isPayer)
 %CALIBRATEMHWABDIAGONAL Calibra i parametri (a,b) del modello MHW a gamma fissato.
 %
@@ -20,16 +20,6 @@ function [aCal, bCal, calib] = calibrateMHWabDiagonal( ...
 
     if nargin < 5 || isempty(isPayer)
         isPayer = true;
-    end
-
-    if gamma < 0 || gamma > 1
-        error('calibrateMHWabDiagonal:GammaOutOfRange', ...
-            'gamma must be in [0,1].');
-    end
-
-    if ~isstruct(diagData) || ~isfield(diagData, 'summary')
-        error('calibrateMHWabDiagonal:InvalidMarketData', ...
-            'diagData must be a struct with field .summary.');
     end
 
     % Initial guess
@@ -57,40 +47,21 @@ function [aCal, bCal, calib] = calibrateMHWabDiagonal( ...
     aCal = xOpt(1);
     bCal = xOpt(2);
 
-    [modelPrices, ok] = modelPricesFromParams(aCal, bCal);
-    if ~ok
-        error('calibrateMHWabDiagonal:PricingFailureAtOptimum', ...
-              'Model pricing failed at calibrated parameters.');
+    [modelPrices, flag] = modelPricesFromParams(aCal, bCal);
+    if ~flag
+        error('Model pricing failed at calibrated parameters.');
     end
 
     residuals = modelPrices - marketPrices;
-    absErrors = abs(residuals);
     rmse = sqrt(mean(residuals.^2));
-
-    resultsTable = table(expiryYears, tenorYears, strikeATM, marketPrices, ...
-        modelPrices, residuals, absErrors, ...
-        'VariableNames', {'ExpiryYears','TenorYears','StrikeATM', ...
-                          'MarketPrice','ModelPrice','Residual','AbsError'});
-
-    calib = struct();
-    calib.a = aCal;
-    calib.b = bCal;
-    calib.gamma = gamma;
-    calib.sse = sseMin;
-    calib.rmse = rmse;
-    calib.marketPrices = marketPrices;
-    calib.modelPrices = modelPrices;
-    calib.residuals = residuals;
-    calib.resultsTable = resultsTable;
-
 
 
 function sse = objectiveAB(x)
     aTry = x(1);
     bTry = x(2);
 
-    [modelTry, okTry] = modelPricesFromParams(aTry, bTry);
-    if ~okTry || any(~isfinite(modelTry))
+    [modelTry, flag] = modelPricesFromParams(aTry, bTry);
+    if ~flag || any(~isfinite(modelTry))
         sse = 1e30;
         return;
     end
