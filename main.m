@@ -180,11 +180,18 @@ end
     %minPoint.a, minPoint.b, minPoint.sse);
 
 %% task 6
-hw.a=15;
-hw.sigma=20;
+hw.a=0.001;
+hw.sigma=0.01;
 [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw,...
      swapData, OIS_Boot, EUR3M_Boot, settlementDate, fixedRate, ...
      isPayer, 'quarterly', cdsSpreads_300, LGD);
-  disp(NPV_riskfree)
-  disp(CVA)
-  disp(final_price)
+fprintf("NPV_riskfree 2022: %.2f EUR\n",NPV_riskfree);
+fprintf("CVA 2022: %.2f EUR\n",CVA);
+fprintf("NPV 2022: %.2f EUR\n",final_price);
+knownFixing = struct('resetStartDate', datetime(2022,12,28), 'resetRate', 0.02202);  
+[NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw,...
+     swapData, OIS_Boot_2, EUR3M_Boot_2, settlementDate_2, fixedRate, ...
+     isPayer, 'quarterly', cdsSpreads_300, LGD,knownFixing);
+fprintf("NPV_riskfree 2023: %.2f EUR\n",NPV_riskfree);
+fprintf("CVA 2023: %.2f EUR\n",CVA);
+fprintf("NPV 2023: %.2f EUR\n",final_price);
