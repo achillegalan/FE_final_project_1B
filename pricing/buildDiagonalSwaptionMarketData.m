@@ -46,6 +46,9 @@ function diagData = buildDiagonalSwaptionMarketData( ...
         floatSched = makeSchedule(expiryDates(i), maturityDates(i), floatStepMonths, 'modifiedfollow');
         fixedSched = makeSchedule(expiryDates(i), maturityDates(i), 12, 'modifiedfollow');
 
+        % floatStepMonths = 6; % Paper requires Euribor 6m floating frequency. 
+        % SE CAMBIAMO QUESTO VA CAMBIATO ANCHE 'SEMIANNUAL' NELLA FUNZ DI BACHELIER   
+
         floatPaymentDates = floatSched(2:end);            % remove start date
         fixedPaymentDates = fixedSched(2:end);            % remove start date
         notionals = ones(numel(floatPaymentDates), 1);    % unit notional (calibration scale)

@@ -62,7 +62,7 @@ function [price, details] = bachelierPSSwaptionPricerDiagonal( ...
     floatYearFracs = yearfrac(floatAccrualStartDates, floatingPaymentDates, 2);
 
     fixedAccrualStartDates = [exerciseDate; fixedPaymentDates(1:end-1)];
-    fixedYearFracs = yearfrac(fixedAccrualStartDates, fixedPaymentDates, 2);
+    fixedYearFracs = yearfrac(fixedAccrualStartDates, fixedPaymentDates, 1); % Paper requires 30/360 for the fixed leg day-count.
 
     % Discounting to expiry-forward measure.
     optionDiscount = getTargetDF(settleDate, OIS_curve.dates, OIS_curve.zeroRates, exerciseDate);

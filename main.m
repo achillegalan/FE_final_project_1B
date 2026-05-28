@@ -170,11 +170,11 @@ end
 %% Landscape della funzione obiettivo (Task 5)
 % gammaPlot = 0.5;
 % % passata veloce
-% aVec = linspace(1e-3, 20, 50);
-% bVec = linspace(1e-3, 20, 50);
+% aVec = linspace(1e-3, 20, 100);
+% bVec = linspace(1e-3, 20, 100);
 % 
 % [A,B,SSE,minPoint] = plotMHWabObjectiveLandscape( ...
 %     OIS_Boot, EUR3M_Boot, diagMkt2022, 0.5, true, aVec, bVec);
-
-%fprintf('Grid min: a=%.6f, b=%.6f, SSE=%.6e\n', ...
-    %minPoint.a, minPoint.b, minPoint.sse);
+% 
+% fprintf('Grid min: a=%.6f, b=%.6f, SSE=%.6e\n', ...
+%     minPoint.a, minPoint.b, minPoint.sse);
