@@ -5,6 +5,13 @@ function [price, details] = model_multiHJM_Price( ...
 % Pricing di una swaption PD nel modello MHW di Baviera (2019), eq. (3.9)-(3.11).
 % Nota: il parametro "b" qui corrisponde a "sigma" del paper.
 
+    if nargin < 10 || isempty(isPayer)
+        isPayer = true;
+    end
+    if nargin < 11 || isempty(isPD)
+        isPD = true;
+    end
+
     settleDate = OIS_curve.settlementDate;
     exerciseDate = add_target_months(settleDate, round(12 * expiryYears), 'modifiedfollow');
 
@@ -14,7 +21,7 @@ function [price, details] = model_multiHJM_Price( ...
     floatingPaymentDates = floatingPaymentDates(floatingPaymentDates > exerciseDate);
     fixedPaymentDates = fixedPaymentDates(fixedPaymentDates > exerciseDate);
 
-   [~, fixedIdxOnFloat] = ismember(fixedPaymentDates, floatingPaymentDates);
+    [~, fixedIdxOnFloat] = ismember(fixedPaymentDates, floatingPaymentDates);
 
     %% OIS CURVE
 
