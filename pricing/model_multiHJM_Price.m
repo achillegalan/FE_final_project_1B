@@ -1,6 +1,6 @@
 function [price, details] = model_multiHJM_Price( ...
     OIS_curve, EUR3M_curve, floatingPaymentDates, fixedPaymentDates, ...
-    strike, expiryYears, a, b, gamma, isPayer)
+    strike, expiryYears, a, b, gamma, isPayer, isPD)
 %MODEL_MULTIHJM_PRICE
 % Pricing di una swaption PD nel modello MHW di Baviera (2019), eq. (3.9)-(3.11).
 % Nota: il parametro "b" qui corrisponde a "sigma" del paper.
@@ -81,31 +81,89 @@ function [price, details] = model_multiHJM_Price( ...
     xStar = solveRootRobust(f);
 
     %% Closed-form PD receiver price (eq. 3.11)
-    Ncdf = @(z) 0.5 * erfc(-z / sqrt(2));
-    receiverPrice = P0T_alpha * ( ...
-        sum(c .* Balpha_pay .* Ncdf(xStar + varsigma)) + ...
-        sum(Balpha_start(2:end) .* Ncdf(xStar + varsigma(1:end-1))) - ...
-        sum(beta .* Balpha_start .* Ncdf(xStar + nu)) );
+    if isPD
+        Ncdf = @(z) 0.5 * erfc(-z / sqrt(2));
+        receiverPrice = P0T_alpha * ( ...
+            sum(c .* Balpha_pay .* Ncdf(xStar + varsigma)) + ...
+            sum(Balpha_start(2:end) .* Ncdf(xStar + varsigma(1:end-1))) - ...
+            sum(beta .* Balpha_start .* Ncdf(xStar + nu)) );
+    
+        % Put-call parity in PD case
+        BPV0 = sum(fixedDelta .* Balpha_pay(fixedIdxOnFloat));
+        num0 = 1 - Balpha_pay(end) + sum(Balpha_start .* (beta - 1));
+    
+        if isPayer
+            price = receiverPrice + P0T_alpha * (num0 - strike * BPV0);
+        else
+            price = receiverPrice;
+        end
 
-    % Put-call parity in PD case
-    BPV0 = sum(fixedDelta .* Balpha_pay(fixedIdxOnFloat));
-    num0 = 1 - Balpha_pay(end) + sum(Balpha_start .* (beta - 1));
-
-    if isPayer
-        price = receiverPrice + P0T_alpha * (num0 - strike * BPV0);
     else
-        price = receiverPrice;
+        Snum_coeff_beta = beta .* Balpha_start;      
+        Snum_coeff_B = Balpha_pay;                
+        Sbpv_delta = fixedDelta;                
+        Sbpv_B = Balpha_pay(fixedIdxOnFloat); 
+        Sbpv_vs = varsigma(fixedIdxOnFloat); 
+ 
+        S_of_x = @(x) ...
+            (sum(Snum_coeff_beta .* exp(-nu       * x - 0.5 * nu.^2))   - ...
+             sum(Snum_coeff_B    .* exp(-varsigma  * x - 0.5 * varsigma.^2))) / ...
+            sum(Sbpv_delta       .* Sbpv_B .* exp(-Sbpv_vs * x - 0.5 * Sbpv_vs.^2));
+ 
+ 
+        nTenor = length(fixedPaymentDates);          
+        C_ann  = @(S) cashAnnuity(S, nTenor);
+ 
+        if isPayer
+            % ---- Payer CS: integral on [x*, +inf) -------------------- %
+            %  I(x) = phi(x) * C(S(x)) * max(S(x) - K, 0)
+            %  put call parity does not hold ofr CS
+            nPts  = 2000;
+            xHigh    = xStar + 40;
+            xGridPay = linspace(xStar, xHigh, nPts);
+            phiPay   = exp(-xGridPay.^2 / 2) / sqrt(2 * pi);
+ 
+            S_pay     = arrayfun(S_of_x, xGridPay);
+            payoffPay = max(S_pay - strike, 0);
+            C_pay     = arrayfun(C_ann,   S_pay);
+ 
+            integrandPay = phiPay .* C_pay .* payoffPay;
+            integrandPay(~isfinite(integrandPay)) = 0;
+ 
+            price = P0T_alpha * trapz(xGridPay, integrandPay);
+
+        else
+            % Receiver CS: integral on (-inf, x*] %
+            %  I(x) = phi(x) * C(S(x)) * max(K - S(x), 0)
+            nPts  = 2000;
+            xLow  = xStar - 40;                         % negligible tail: phi(xStar-40) ~ 0
+            xGridRec  = linspace(xLow, xStar, nPts);
+            phiRec = exp(-xGridRec.^2 / 2) / sqrt(2 * pi);
+     
+            S_rec = arrayfun(S_of_x, xGridRec);
+            payoffRec = max(strike - S_rec, 0);
+            C_rec = arrayfun(C_ann,  S_rec);
+     
+            integrandRec = phiRec .* C_rec .* payoffRec;
+            % removing NaN from possible S(x) <= -1 (cash annuity undefined)
+            integrandRec(~isfinite(integrandRec)) = 0;
+     
+            price = P0T_alpha * trapz(xGridRec, integrandRec);
+        end
     end
+     
 
     details = struct();
     details.exerciseDate = exerciseDate;
     details.xStar = xStar;
-    details.receiverPrice = receiverPrice;
-    details.BPV0 = BPV0;
-    details.num0 = num0;
+    details.Price = price;
+    %details.BPV0 = BPV0;
+    %details.num0 = num0;
 
+
+% ------------------------ Inside Functions -------------------------------
 function xRoot = solveRootRobust(fun)
-    % Robust root search: start from a base interval and expand progressively.
+    % Robust root search: start from a base interval and expand progressively
     halfWidth = 40;
     maxHalfWidth = 640;
     nGrid = 1601;
@@ -172,19 +230,34 @@ function xRoot = solveRootRobust(fun)
     error('model_multiHJM_Price:RootNotFound', ...
         'Unable to find a stable root for f(x)=0 up to |x| <= %.0f.', maxHalfWidth);
 
-    function [tf, xCandidate] = check_root(seed)
-        % Run fzero and accept the candidate only if residual/exit checks pass.
-        tf = false;
-        xCandidate = NaN;
-        try
-            [xTry, fTry, exitflag] = fzero(fun, seed, opts);
-            tf = exitflag > 0 && isfinite(xTry) && isfinite(fTry) && abs(fTry) <= rootTol;
-            if tf
-                xCandidate = xTry;
-            end
-        catch
-            % Keep tf=false and let outer logic try other seeds/ranges.
+function [tf, xCandidate] = check_root(seed)
+    % Run fzero and accept the candidate only if residual/exit checks pass.
+    tf = false;
+    xCandidate = NaN;
+    try
+        [xTry, fTry, exitflag] = fzero(fun, seed, opts);
+        tf = exitflag > 0 && isfinite(xTry) && isfinite(fTry) && abs(fTry) <= rootTol;
+        if tf
+            xCandidate = xTry;
         end
+    catch
+        % Keep tf=false and let outer logic try other seeds/ranges.
+    end
     end
 end
+
+function C = cashAnnuity(S, n)
+%CASHANNUITY  Cash annuity C_{alpha,omega}(S) with m = 1  (eq. 2.17).
+%   C(S) = [1 - (1+S)^{-n}] / S   per S in (-1, 0) U (0, +inf)
+%   C(0) = n
+%   C(S) = NaN  S <= -1  (annuity undefined)
+    if S <= -1
+        C = NaN;
+    elseif abs(S) < 1e-10
+        C = n;
+    else
+        C = (1 - (1 + S)^(-n)) / S;
+    end
+end
+ 
 end
