@@ -38,20 +38,6 @@ OIS_Boot_2 = bootstrapOIS(settlementDate_2, OIS_Curve_2);
 EUR3M_Boot_2 = bootstrapCrab3M(EUR3M_Curve_2, OIS_Boot_2, settlementDate_2, true);
 %disp(EUR3M_Boot_2.table)
 
-% Plot: OIS discount curve 2022 vs 2023 (MA ANCHE DA TOGLIERE)
-% tau22 = yearfrac(settlementDate, OIS_Boot.dates, 3);
-% tau23 = yearfrac(settlementDate_2, OIS_Boot_2.dates, 3);
-
-% figure;
-% plot(tau22, OIS_Boot.discounts, '-o', 'LineWidth', 1.3, 'DisplayName', 'OIS 2022');
-% hold on;
-% plot(tau23, OIS_Boot_2.discounts, '-s', 'LineWidth', 1.3, 'DisplayName', 'OIS 2023');
-% grid on;
-% xlabel('Maturity (years)');
-% ylabel('Discount Factor');
-% title('OIS Discount Curves: 2022 vs 2023');
-% legend('Location','best');
-
 %% TASK 2: NPV_riskfree Ammortized Swap
 fprintf('\n\n========= Task 2: NPV risk-free 2022 =========\n')
 fixedRate = 0.0221;
@@ -74,59 +60,65 @@ isPayer = true;
 fixingFrequency = 'quarterly';
 LGD = 0.40;
 
-% Scenario 1: CDS Spread = 300 bps
-cdsSpreads_300 = 0.03; 
-[CVA_300, survProbs_300] = computeCVA( ...
-    swapData,OIS_Boot, EUR3M_Boot, settlementDate, strike, normalVol, ...
-    isPayer, fixingFrequency, cdsSpreads_300, LGD);
-[CVA_300_cost, survProbs_300_cost] = computeCVAConstantLambda( ...
-     swapData,OIS_Boot, EUR3M_Boot, settlementDate, strike, normalVol, ...
-     isPayer, fixingFrequency, cdsSpreads_300, LGD);    
-% Scenario 2: CDS Spread = 500 bps
-cdsSpreads_500 = 0.05; 
-[CVA_500, survProbs_500] = computeCVA( ...
-    swapData,OIS_Boot, EUR3M_Boot, settlementDate, strike, normalVol, ...
-    isPayer, fixingFrequency, cdsSpreads_500, LGD);
-[CVA_500_cost, survProbs_500_cost] = computeCVAConstantLambda( ...
-     swapData,OIS_Boot, EUR3M_Boot, settlementDate, strike, normalVol, ...
-     isPayer, fixingFrequency, cdsSpreads_500, LGD);    
-NPV_300 = swap_quarterly - CVA_300;
-NPV_500 = swap_quarterly - CVA_500;
+scenarioBps = [300 500];
+cdsSpreads  = scenarioBps/1e4;
+cdsSpreads_300 = cdsSpreads(1);
+cdsSpreads_500 = cdsSpreads(2);
 
-fprintf("CVA (CDS = 300 bps)          : %.2f EUR\n", CVA_300);
-fprintf("CVA cost (CDS = 300 bps)     : %.2f EUR\n", CVA_300_cost);
-fprintf("Swap NPV with CVA (300 bps)  : %.2f EUR\n", NPV_300);
-fprintf("CVA (CDS = 500 bps)          : %.2f EUR\n", CVA_500);
-fprintf("CVA cost (CDS = 500 bps)     : %.2f EUR\n", CVA_500_cost);
-fprintf("Swap NPV with CVA (500 bps)  : %.2f EUR\n\n", NPV_500);
+[CVA_cell, surv_cell] = arrayfun(@(s) computeCVA( ...
+    swapData, OIS_Boot, EUR3M_Boot, settlementDate, strike, normalVol, ...
+    isPayer, fixingFrequency, s, LGD), cdsSpreads, 'UniformOutput', false);
+
+[CVA_cost_cell, surv_cost_cell] = arrayfun(@(s) computeCVAConstantLambda( ...
+    swapData, OIS_Boot, EUR3M_Boot, settlementDate, strike, normalVol, ...
+    isPayer, fixingFrequency, s, LGD), cdsSpreads, 'UniformOutput', false);
+
+CVA_vec      = [CVA_cell{:}];
+CVA_cost_vec = [CVA_cost_cell{:}];
+NPV_vec      = swap_quarterly - CVA_vec;
+
+fprintf('\n%-10s | %-14s | %-14s | %-18s\n', ...
+    'CDS (bps)', 'CVA [EUR]', 'CVA cost [EUR]', 'Swap NPV with CVA');
+fprintf('%s\n', repmat('-', 1, 68));
+for k = 1:numel(scenarioBps)
+    fprintf('%-10d | %14.2f | %14.2f | %18.2f\n', ...
+        scenarioBps(k), CVA_vec(k), CVA_cost_vec(k), NPV_vec(k));
+end
 
 %% TASK 4: CVA 2023
 fprintf('\n\n========= Task 4: CVA Computation 2023 =========\n')
 % the rate is taken by ...
-knownFixing = struct('resetStartDate', datetime(2022,12,28), 'resetRate', 0.02202);
+knownFixing_2023 = struct('resetStartDate', datetime(2022,12,28), 'resetRate', 0.02202);
 
-swap_unwind_quarterly = AmmortizedSwapPricer( ...
-    swapData, OIS_Boot_2, EUR3M_Boot_2, settlementDate_2, fixedRate, 'quarterly', knownFixing);
-swap_unwind_semiannual = AmmortizedSwapPricer( ...
-    swapData, OIS_Boot_2, EUR3M_Boot_2, settlementDate_2, fixedRate, 'semiannual', knownFixing);
-fprintf("Swap price from Bank perspective (MtM) [reset: quarterly] is: %.2f EUR\n", swap_unwind_quarterly);
-fprintf("Swap price from Bank perspective (MtM) [reset: semiannual] is: %.2f EUR\n", swap_unwind_semiannual);
+resetFrequencies = {'quarterly', 'semiannual'};
+swapUnwindPrices = cellfun(@(f) AmmortizedSwapPricer( ...
+    swapData, OIS_Boot_2, EUR3M_Boot_2, settlementDate_2, fixedRate, f, knownFixing_2023), ...
+    resetFrequencies);
 
-normalVol_2=loadSwaptionVolsUnwinding();
-% Unwinding CVA at 300 bps
-[CVA_unwind_300,survProbs_300, CVA_det_300, CVA_stoch_300] = computeCVA( ...
-     swapData, OIS_Boot_2, EUR3M_Boot_2, settlementDate_2, fixedRate, ...
-     normalVol_2, isPayer, 'quarterly', cdsSpreads_300, LGD,knownFixing);
+fprintf('\n%-12s | %-16s\n', 'Reset', 'MtM [EUR]');
+fprintf('%s\n', repmat('-', 1, 33));
+for k = 1:numel(resetFrequencies)
+    fprintf('%-12s | %16.2f\n', resetFrequencies{k}, swapUnwindPrices(k));
+end
 
-% Unwinding CVA at 500 bps
-[CVA_unwind_500, survProbs_500, CVA_det_500, CVA_stoch_500] = computeCVA( ...
-     swapData, OIS_Boot_2, EUR3M_Boot_2, settlementDate_2, fixedRate, ...
-     normalVol_2, isPayer, 'quarterly', cdsSpreads_500, LGD,knownFixing);
-fprintf("Unwind CVA (CDS = 300 bps)          : %.2f EUR\n", CVA_unwind_300);
-fprintf("Unwind Swap NPV with CVA (300 bps)  : %.2f EUR\n", swap_unwind_quarterly - CVA_unwind_300);
+normalVol_2 = loadSwaptionVolsUnwinding();
+[CVA_unwind_cell, survProbs_unwind_cell, CVA_det_cell, CVA_stoch_cell] = arrayfun(@(s) computeCVA( ...
+    swapData, OIS_Boot_2, EUR3M_Boot_2, settlementDate_2, fixedRate, ...
+    normalVol_2, isPayer, 'quarterly', s, LGD, knownFixing_2023), ...
+    cdsSpreads, 'UniformOutput', false);
 
-fprintf("Unwind CVA (CDS = 500 bps)          : %.2f EUR\n", CVA_unwind_500);
-fprintf("Unwind Swap NPV with CVA (500 bps)  : %.2f EUR\n", swap_unwind_quarterly - CVA_unwind_500);
+CVA_unwind_vec = [CVA_unwind_cell{:}];
+CVA_det_vec = [CVA_det_cell{:}];
+CVA_stoch_vec = [CVA_stoch_cell{:}];
+NPV_unwind_vec = swapUnwindPrices(1) - CVA_unwind_vec;
+
+fprintf('\n%-10s | %-14s | %-14s | %-14s | %-18s\n', ...
+    'CDS (bps)', 'CVA [EUR]', 'CVA_det [EUR]', 'CVA_stoch [EUR]', 'Swap NPV with CVA');
+fprintf('%s\n', repmat('-', 1, 84));
+for k = 1:numel(scenarioBps)
+    fprintf('%-10d | %14.2f | %14.2f | %14.2f | %18.2f\n', ...
+        scenarioBps(k), CVA_unwind_vec(k), CVA_det_vec(k), CVA_stoch_vec(k), NPV_unwind_vec(k));
+end
 
 %% TASK 5: Calibration
 fprintf('\n\n========= Task 5: Calibration Multicurve Swaption model =========\n')
@@ -138,22 +130,38 @@ diagTenor  = [15; 12; 10; 7; 5; 3; 1];
 diagSwaptions2022 = buildDiagonalSwaptionTable(diagExpiry, diagTenor, "2022");
 diagSwaptions2023 = buildDiagonalSwaptionTable(diagExpiry, diagTenor, "2023");
 
-isPayer = true; isCS = true;
+isPayer = true;
+deliveryFlags = [true, false];  % true = Physical Delivery, false = Cash Settle
 
-diagMkt2022 = buildDiagonalSwaptionMarketData(OIS_Boot, EUR3M_Boot, diagSwaptions2022, isPayer, isCS);
-diagMkt2023 = buildDiagonalSwaptionMarketData(OIS_Boot_2, EUR3M_Boot_2, diagSwaptions2023, isPayer, isCS);
-%disp(diagMkt2022.summary)
-%disp(diagMkt2023.summary)
+deliveryNames = {'PHYSICAL DELIVERY', 'CASH SETTLE'};
+for m = 1:numel(deliveryFlags)
+    isPDMode = deliveryFlags(m);
+    isCSMode = ~isPDMode;  % CS convention for cash-settled, PS convention for physical-delivery
 
-for g = gammas
-    [a22, b22, cal22] = calibrateMHWabDiagonal(OIS_Boot, EUR3M_Boot, diagMkt2022, g, isPayer, isCS);
-    [a23, b23, cal23] = calibrateMHWabDiagonal(OIS_Boot_2, EUR3M_Boot_2, diagMkt2023, g, isPayer, isCS);
+    diagMkt2022 = buildDiagonalSwaptionMarketData( ...
+        OIS_Boot, EUR3M_Boot, diagSwaptions2022, isPayer, isCSMode);
+    diagMkt2023 = buildDiagonalSwaptionMarketData( ...
+        OIS_Boot_2, EUR3M_Boot_2, diagSwaptions2023, isPayer, isCSMode);
 
-    fprintf('\nGamma = %.2f\n', g);
-    fprintf('  2022 -> a = %.8f, b = %.8f, SSE = %.6e\n ', ...
-        a22, b22, cal22.sse);
-    fprintf('  2023 -> a = %.8f, b = %.8f, SSE = %.6e\n', ...
-        a23, b23, cal23.sse);
+    [a22_c, b22_c, cal22_c] = arrayfun(@(g) calibrateMHWabDiagonal( ...
+        OIS_Boot, EUR3M_Boot, diagMkt2022, g, isPayer, isPDMode), ...
+        gammas, 'UniformOutput', false);
+    [a23_c, b23_c, cal23_c] = arrayfun(@(g) calibrateMHWabDiagonal( ...
+        OIS_Boot_2, EUR3M_Boot_2, diagMkt2023, g, isPayer, isPDMode), ...
+        gammas, 'UniformOutput', false);
+
+    marketConvLabel = 'PS';
+    if isCSMode
+        marketConvLabel = 'CS';
+    end
+    fprintf('\n%s  [market convention: %s]\n', ...
+        deliveryNames{m}, marketConvLabel);
+    fprintf('%-8s | %-37s | %-37s\n', 'Gamma', '2022 (a, b, SSE)', '2023 (a, b, SSE)');
+    fprintf('%s\n', repmat('-', 1, 90));
+    for k = 1:numel(gammas)
+        fprintf('%-8.2f | a=%10.8f, b=%10.8f, SSE=%10.3e | a=%10.8f, b=%10.8f, SSE=%10.3e\n', ...
+            gammas(k), a22_c{k}, b22_c{k}, cal22_c{k}.sse, a23_c{k}, b23_c{k}, cal23_c{k}.sse);
+    end
 end
 %% Landscape della funzione obiettivo (Task 5)
 % gammaPlot = 0.5;

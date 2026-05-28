@@ -97,12 +97,11 @@ function [price, details] = bachelierPSSwaptionPricerDiagonal( ...
     forwardSwapRate = floatLegFwdValue / annuityFwd;
 
     if isCS
+        nTenor = length(fixedPaymentDates); % same convention as model_multiHJM_Price
         if abs(forwardSwapRate) < 1e-12
-            tau = yearfrac(exerciseDate, floatingPaymentDates(end));
-            annuityFwd = tau;
+            annuityFwd = nTenor;
         else
-            tau = yearfrac(exerciseDate, floatingPaymentDates(end));
-            annuityFwd = (1 - 1/(1 + forwardSwapRate)^tau)/forwardSwapRate;
+            annuityFwd = (1 - (1 + forwardSwapRate)^(-nTenor)) / forwardSwapRate;
         end
     end
 
