@@ -11,7 +11,6 @@ function [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw,...
 %   EUR3M_curve     - Struct containing dates, zeroRates for forecasting.
 %   settlementDate  - Valuation datetime (e.g., June 2022 or Jan 2023).
 %   strike          - Fixed swap rate K.
-%   normalVol       - Swaption normal volatility cube data structure.
 %   isPayer         - Logical flag: true for Payer, false for Receiver.
 %   fixingFrequency - String flag: 'quarterly' or 'semiannual'.
 %   cdsSpreads      - Given CDS spread in decimal form (e.g., 300 bps = 0.03).
@@ -76,10 +75,9 @@ function [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw,...
     end
 
     % ---------------------------------------------------------------------
-    % 4. FORWARD INDUCTION (ALPHA CALIBRATION)
+    % 4. FORWARD INDUCTION (STATE PROBABILITIES)
     % ---------------------------------------------------------------------
     Q = zeros(num_nodes, N+1);
-    alpha = zeros(N, 1);
     mid_idx = j_max + 1;
     Q(mid_idx, 1) = 1.0;
 
@@ -88,15 +86,9 @@ function [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw,...
     P_OIS_grid = getTargetDF(settlementDate, OIS_curve.dates, OIS_curve.zeroRates, dates_grid);
 
     for n = 1:N
-        P_market = P_OIS_grid(n+1);
-        sum_Q_exp_x = sum(Q(:, n) .* exp(-x_space * dt));
-        alpha(n) = (1 / dt) * log(sum_Q_exp_x / P_market);
-        
-        r_t = x_space + alpha(n);
-        
         for k = 1:num_nodes
             if Q(k, n) > 0
-                val = Q(k, n) * exp(-r_t(k) * dt);
+                val = Q(k, n); % pure transition probabilities (no discounting)
                 Q(idx_u(k), n+1) = Q(idx_u(k), n+1) + val * pu(k);
                 Q(idx_m(k), n+1) = Q(idx_m(k), n+1) + val * pm(k);
                 Q(idx_d(k), n+1) = Q(idx_d(k), n+1) + val * pd(k);
@@ -137,7 +129,7 @@ function [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw,...
         
         if t_reset <= settlementDate
             is_det = true;
-            if nargin >= 12 && ~isempty(knownFixing) && ~isnan(knownFixing.resetRate)
+            if nargin >= 11 && ~isempty(knownFixing) && ~isnan(knownFixing.resetRate)
                 det_rate = knownFixing.resetRate;
             else
                 % Implied forward rate fallback
@@ -189,8 +181,7 @@ function [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw,...
         
         % Discount the Continuation Value (except at the exact end)
         if n <= N
-            r_t = x_space + alpha(n);
-            discount = exp(-r_t * dt);
+            discount = P_OIS_grid(n+1) / P_OIS_grid(n); % Deterministic OIS
             EV = pu .* V(idx_u) + pm .* V(idx_m) + pd .* V(idx_d);
             V = discount .* EV;
         end
@@ -211,28 +202,27 @@ function [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw,...
                 
                 % Analytical Bond pricing components
                 B_term2 = B_hw(t1, t2);
-                B_term_pay = B_hw(t1, t_pay);
                 
-                P_OIS_0_t1  = getTargetDF(settlementDate, OIS_curve.dates, OIS_curve.zeroRates, settlementDate + days(round(t1*365)));
-                P_OIS_0_t2  = getTargetDF(settlementDate, OIS_curve.dates, OIS_curve.zeroRates, settlementDate + days(round(t2*365)));
-                P_OIS_0_pay = getTargetDF(settlementDate, OIS_curve.dates, OIS_curve.zeroRates, settlementDate + days(round(t_pay*365)));
+                date1 = settlementDate + days(round(t1*365));
+                date2 = settlementDate + days(round(t2*365));
+                date_pay = settlementDate + days(round(t_pay*365));
                 
-                P_EUR_0_t1  = getTargetDF(settlementDate, EUR3M_curve.dates, EUR3M_curve.zeroRates, settlementDate + days(round(t1*365)));
-                P_EUR_0_t2  = getTargetDF(settlementDate, EUR3M_curve.dates, EUR3M_curve.zeroRates, settlementDate + days(round(t2*365)));
+                P_OIS_0_t1  = getTargetDF(settlementDate, OIS_curve.dates, OIS_curve.zeroRates, date1);
+                P_OIS_0_pay = getTargetDF(settlementDate, OIS_curve.dates, OIS_curve.zeroRates, date_pay);
                 
-                % Deterministic Beta extraction (Gamma = 0)
-                beta_1 = P_OIS_0_t1 / P_EUR_0_t1;
-                beta_2 = P_OIS_0_t2 / P_EUR_0_t2;
+                P_EUR_0_t1  = getTargetDF(settlementDate, EUR3M_curve.dates, EUR3M_curve.zeroRates, date1);
+                P_EUR_0_t2  = getTargetDF(settlementDate, EUR3M_curve.dates, EUR3M_curve.zeroRates, date2);
                 
                 phi_t1 = phi_hw(t1);
                 
-                % Multi-Curve forward extraction via node values
-                P_OIS_node_t2 = (P_OIS_0_t2 / P_OIS_0_t1) * exp(-B_term2 * x_space - 0.5 * B_term2^2 * phi_t1);
-                P_OIS_node_pay = (P_OIS_0_pay / P_OIS_0_t1) * exp(-B_term_pay * x_space - 0.5 * B_term_pay^2 * phi_t1);
+                % OIS is purely deterministic (Gamma = 0)
+                P_OIS_node_pay = (P_OIS_0_pay / P_OIS_0_t1); 
                 
-                P_EUR_node_t2 = P_OIS_node_t2 * (beta_1 / beta_2);
+                % Euribor holds the full HW volatility
+                P_EUR_node_t2 = (P_EUR_0_t2 / P_EUR_0_t1) * exp(-B_term2 * x_space - 0.5 * B_term2^2 * phi_t1);
                 
-                delta_basis = 0.25; % 3M basis
+                % Dynamic year fraction based on exact grid dates
+                delta_basis = yearfrac(date1, date2, 2); % ACT/360
                 L_node = (1/delta_basis) * (1 ./ P_EUR_node_t2 - 1);
                 
                 if isPayer
@@ -246,9 +236,9 @@ function [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw,...
         end
         
         % 3. Measure EPE _after_ resetting CFs are injected
-        % (matches the exact exposure of a swaption entered on this date)
+        % EPE(t) requires multiplication by P_OIS(0, t) to return Present Value
         Exposure = max(V, 0);
-        EPE(n) = sum(Q(:, n) .* Exposure);
+        EPE(n) = P_OIS_grid(n) * sum(Q(:, n) .* Exposure);
     end
     
     NPV_riskfree = V(mid_idx);
@@ -258,7 +248,6 @@ function [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw,...
     % ---------------------------------------------------------------------
     futurePayDates = allPayDates(idx_future);
     
-    % Use existing logic to bootstrap Q(T)
     survProbs = bootstrapSurvivalProbabilities(OIS_curve, futurePayDates, cdsSpreads, LGD);
     
     survProbsFull = [1; survProbs];

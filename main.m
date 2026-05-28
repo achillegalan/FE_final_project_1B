@@ -180,3 +180,11 @@ end
     %minPoint.a, minPoint.b, minPoint.sse);
 
 %% task 6
+hw.a=15;
+hw.sigma=20;
+[NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw,...
+     swapData, OIS_Boot, EUR3M_Boot, settlementDate, fixedRate, ...
+     isPayer, 'quarterly', cdsSpreads_300, LGD);
+  disp(NPV_riskfree)
+  disp(CVA)
+  disp(final_price)
