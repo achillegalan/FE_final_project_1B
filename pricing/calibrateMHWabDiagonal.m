@@ -1,5 +1,5 @@
 function [aCal, bCal, calib] = calibrateMHWabDiagonal( ...
-    OIS_curve, EUR3M_curve, diagData, gamma, isPayer)
+    OIS_curve, EUR3M_curve, diagData, gamma, isPayer, isPD)
 %CALIBRATEMHWABDIAGONAL Calibra i parametri (a,b) del modello MHW a gamma fissato.
 %
 % Minimizza la funzione errore del paper (eq. 4.1):
@@ -33,7 +33,7 @@ function [aCal, bCal, calib] = calibrateMHWabDiagonal( ...
     end
 
     % Initial guess
-    x0 = [0.1, 0.1];
+    x0 = [0.01, 0.01];
     
     mkt = diagData.summary;
     expiryYears = mkt.ExpiryYears(:);
@@ -120,14 +120,12 @@ function [modelVec, flag] = modelPricesFromParams(aTry, bTry)
 
             modelVec(i) = model_multiHJM_Price( ...
                 OIS_curve, EUR3M_curve, floatPayDates, fixedPayDates, ...
-                strikeATM(i), expiryYears(i), aTry, bTry, gamma, isPayer);
+                strikeATM(i), expiryYears(i), aTry, bTry, gamma, isPayer, isPD);
         catch
             flag = false;
             return;
         end
     end
 end
-
-
 
 end
