@@ -162,9 +162,9 @@ for g = gammas
     [a23, b23, cal23] = calibrateMHWabDiagonal(OIS_Boot_2, EUR3M_Boot_2, diagMkt2023, g, true);
 
     fprintf('\nGamma = %.2f\n', g);
-    fprintf('  2022 -> a = %.8f, b = %.8f, SSE = %.6e,\n ', ...
+    fprintf('  2022 -> a = %.8f, b = %.8f, SSE = %.6e\n ', ...
         a22, b22, cal22.sse);
-    fprintf('  2023 -> a = %.8f, b = %.8f, SSE = %.6e,\n', ...
+    fprintf('  2023 -> a = %.8f, b = %.8f, SSE = %.6e\n', ...
         a23, b23, cal23.sse);
 end
 %% Landscape della funzione obiettivo (Task 5)
@@ -180,6 +180,7 @@ end
     %minPoint.a, minPoint.b, minPoint.sse);
 
 %% task 6
+fprintf('\n\n=== Task 6: Amortizing Swap Pricing with CVA with numerical technique ===\n')
 hw.a=0.001;
 hw.sigma=0.01;
 [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw,...
