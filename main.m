@@ -3,12 +3,7 @@
 clc
 clear all
 rng(1234);
-format long g
-
-addpath('data')
-addpath('bootstrap')
-addpath('utilities')
-addpath('pricing')
+ActiveFolders()
 
 %% LOADING DATASET
 % 2022
@@ -148,9 +143,10 @@ diagMkt2023 = buildDiagonalSwaptionMarketData(OIS_Boot_2, EUR3M_Boot_2, diagSwap
 %disp(diagMkt2022.summary)
 %disp(diagMkt2023.summary)
 
+isPayer = true; isPD = true;
 for g = gammas
-    [a22, b22, cal22] = calibrateMHWabDiagonal(OIS_Boot, EUR3M_Boot, diagMkt2022, g, true);
-    [a23, b23, cal23] = calibrateMHWabDiagonal(OIS_Boot_2, EUR3M_Boot_2, diagMkt2023, g, true);
+    [a22, b22, cal22] = calibrateMHWabDiagonal(OIS_Boot, EUR3M_Boot, diagMkt2022, g, isPayer, isPD);
+    [a23, b23, cal23] = calibrateMHWabDiagonal(OIS_Boot_2, EUR3M_Boot_2, diagMkt2023, g, isPayer, isPD);
 
     fprintf('\nGamma = %.2f\n', g);
     fprintf('  2022 -> a = %.8f, b = %.8f, SSE = %.6e\n ', ...
