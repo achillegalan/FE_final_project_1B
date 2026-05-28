@@ -32,20 +32,18 @@ EUR3M_Curve_2 = importExcellData(curveFile_2, 'Curve 3M 31 Jan',  curveColumns);
 swapData = importExcellData('SwapAmortizingPlan_v1.xlsx', 'SwapPlan', ...
     {'Pay Date', 'Accrual Start', 'Accrual End', 'Days', 'Notional'});
 
-%% 2022 curves
+%% TASK 1: Multi-curve
+% 2022 curves
 OIS_Boot = bootstrapOIS(settlementDate, OIS_Curve);
 EUR3M_Boot = bootstrapCrab3M(EUR3M_Curve, OIS_Boot, settlementDate, true);
-% disp('=== EUR3M CRAB - NODI BOOTSTRAP ===')
-% disp(EUR3M_Boot.nodesTable)
-% disp('=== EUR3M CRAB - TUTTE LE DATE CALCOLATE ===')
 % disp(EUR3M_Boot.table)
 
-%% 2023 curves
+% 2023 curves
 OIS_Boot_2 = bootstrapOIS(settlementDate_2, OIS_Curve_2);
 EUR3M_Boot_2 = bootstrapCrab3M(EUR3M_Curve_2, OIS_Boot_2, settlementDate_2, true);
 %disp(EUR3M_Boot_2.table)
 
-%% Plot: OIS discount curve 2022 vs 2023 (MA ANCHE DA TOGLIERE)
+% Plot: OIS discount curve 2022 vs 2023 (MA ANCHE DA TOGLIERE)
 % tau22 = yearfrac(settlementDate, OIS_Boot.dates, 3);
 % tau23 = yearfrac(settlementDate_2, OIS_Boot_2.dates, 3);
 
@@ -59,8 +57,8 @@ EUR3M_Boot_2 = bootstrapCrab3M(EUR3M_Curve_2, OIS_Boot_2, settlementDate_2, true
 % title('OIS Discount Curves: 2022 vs 2023');
 % legend('Location','best');
 
-%% task 2: NPV_riskfree Ammortized Swap
-fprintf('=== Task 2: NPV risk-free 2022 ===\n\n')
+%% TASK 2: NPV_riskfree Ammortized Swap
+fprintf('\n\n========= Task 2: NPV risk-free 2022 =========\n')
 fixedRate = 0.0221;
 swap_quarterly = AmmortizedSwapPricer( ...
     swapData, OIS_Boot, EUR3M_Boot, settlementDate, fixedRate, 'quarterly', []);
@@ -68,11 +66,11 @@ swap_semiannual = AmmortizedSwapPricer( ...
     swapData, OIS_Boot, EUR3M_Boot, settlementDate, fixedRate, 'semiannual', []);
 fprintf("Swap price from Bank perspective (MtM) [reset: quarterly] is: %.2f EUR\n", swap_quarterly);
 fprintf("Swap price from Bank perspective (MtM) [reset: semiannual] is: %.2f EUR\n", swap_semiannual);
-%% Task 3: Amortizing Swap Pricing with CVA: simplified approach
-fprintf('\n=== Task 3: CVA Computation 2022 ===\n\n')
+
+%% TASK 3: Amortizing Swap Pricing with CVA: simplified approach
+fprintf('\n\n========= Task 3: CVA Computation 2022 =========\n')
 
 normalVol = loadSwaptionVols();
-
 strike = fixedRate;
 % Bank receives Euribor 3M, pays 2.21%. 
 % The exposure to Corporate default happens when the swap value is positive to Bank. 
@@ -107,8 +105,8 @@ fprintf("CVA (CDS = 500 bps)          : %.2f EUR\n", CVA_500);
 fprintf("CVA cost (CDS = 500 bps)     : %.2f EUR\n", CVA_500_cost);
 fprintf("Swap NPV with CVA (500 bps)  : %.2f EUR\n\n", NPV_500);
 
-%% task 4
-fprintf('\n=== Task 4: CVA Computation 2023 ===\n\n')
+%% TASK 4: CVA 2023
+fprintf('\n\n========= Task 4: CVA Computation 2023 =========\n')
 % the rate is taken by ...
 knownFixing = struct('resetStartDate', datetime(2022,12,28), 'resetRate', 0.02202);
 
@@ -135,8 +133,8 @@ fprintf("Unwind Swap NPV with CVA (300 bps)  : %.2f EUR\n", swap_unwind_quarterl
 fprintf("Unwind CVA (CDS = 500 bps)          : %.2f EUR\n", CVA_unwind_500);
 fprintf("Unwind Swap NPV with CVA (500 bps)  : %.2f EUR\n", swap_unwind_quarterly - CVA_unwind_500);
 
-%% task 5
-fprintf('\n=== Task 5: Calibration Multicurve Swaption model ===\n\n')
+%% TASK 5: Calibration
+fprintf('\n\n========= Task 5: Calibration Multicurve Swaption model =========\n')
 gammas = [0, 0.5, 1];
 
 % Build diagonal swaption quotes directly from the full market cubes.
@@ -172,8 +170,8 @@ end
 %fprintf('Grid min: a=%.6f, b=%.6f, SSE=%.6e\n', ...
     %minPoint.a, minPoint.b, minPoint.sse);
 
-%% task 6
-fprintf('\n\n=== Task 6: Amortizing Swap Pricing with CVA with numerical technique ===\n')
+%% TASK 6: CVA with tree
+fprintf('\n\n========= Task 6: Amortizing Swap Pricing with CVA with numerical technique =========\n')
 hw.a=0.001;
 hw.sigma=0.01;
 [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw,...
@@ -182,6 +180,7 @@ hw.sigma=0.01;
 fprintf("NPV_riskfree 2022: %.2f EUR\n",NPV_riskfree);
 fprintf("CVA 2022: %.2f EUR\n",CVA);
 fprintf("NPV 2022: %.2f EUR\n",final_price);
+
 knownFixing = struct('resetStartDate', datetime(2022,12,28), 'resetRate', 0.02202);  
 [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw,...
      swapData, OIS_Boot_2, EUR3M_Boot_2, settlementDate_2, fixedRate, ...
