@@ -138,15 +138,16 @@ diagTenor  = [15; 12; 10; 7; 5; 3; 1];
 diagSwaptions2022 = buildDiagonalSwaptionTable(diagExpiry, diagTenor, "2022");
 diagSwaptions2023 = buildDiagonalSwaptionTable(diagExpiry, diagTenor, "2023");
 
-diagMkt2022 = buildDiagonalSwaptionMarketData(OIS_Boot, EUR3M_Boot, diagSwaptions2022, true);
-diagMkt2023 = buildDiagonalSwaptionMarketData(OIS_Boot_2, EUR3M_Boot_2, diagSwaptions2023, true);
+isPayer = true; isCS = true;
+
+diagMkt2022 = buildDiagonalSwaptionMarketData(OIS_Boot, EUR3M_Boot, diagSwaptions2022, isPayer, isCS);
+diagMkt2023 = buildDiagonalSwaptionMarketData(OIS_Boot_2, EUR3M_Boot_2, diagSwaptions2023, isPayer, isCS);
 %disp(diagMkt2022.summary)
 %disp(diagMkt2023.summary)
 
-isPayer = true; isPD = true;
 for g = gammas
-    [a22, b22, cal22] = calibrateMHWabDiagonal(OIS_Boot, EUR3M_Boot, diagMkt2022, g, isPayer, isPD);
-    [a23, b23, cal23] = calibrateMHWabDiagonal(OIS_Boot_2, EUR3M_Boot_2, diagMkt2023, g, isPayer, isPD);
+    [a22, b22, cal22] = calibrateMHWabDiagonal(OIS_Boot, EUR3M_Boot, diagMkt2022, g, isPayer, isCS);
+    [a23, b23, cal23] = calibrateMHWabDiagonal(OIS_Boot_2, EUR3M_Boot_2, diagMkt2023, g, isPayer, isCS);
 
     fprintf('\nGamma = %.2f\n', g);
     fprintf('  2022 -> a = %.8f, b = %.8f, SSE = %.6e\n ', ...
