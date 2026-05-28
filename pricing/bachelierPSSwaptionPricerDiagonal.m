@@ -1,6 +1,6 @@
 function [price, details] = bachelierPSSwaptionPricerDiagonal( ...
     OIS_curve, EUR3M_curve, floatingPaymentDates, fixedPaymentDates, ...
-    strike, normalVol, TTM, Notional, isPayer, fixingFrequency)
+    strike, normalVol, TTM, Notional, isPayer, fixingFrequency, isCS)
 %BACHELIERPSSWAPTIONPRICERDIAGONAL Prices a physical-settlement swaption with Bachelier formula.
 %
     if nargin < 9 || isempty(isPayer)
@@ -95,6 +95,16 @@ function [price, details] = bachelierPSSwaptionPricerDiagonal( ...
     floatLegFwdValue = sum(floatFwdDiscounts .* floatYearFracs .* ...
                            amortizedNotionalFloat .* fixingRates);
     forwardSwapRate = floatLegFwdValue / annuityFwd;
+
+    if isCS
+        if abs(forwardSwapRate) < 1e-12
+            tau = yearfrac(exerciseDate, floatingPaymentDates(end));
+            annuityFwd = tau;
+        else
+            tau = yearfrac(exerciseDate, floatingPaymentDates(end));
+            annuityFwd = (1 - 1/(1 + forwardSwapRate)^tau)/forwardSwapRate;
+        end
+    end
 
     %% Bachelier closed-form.
     w = 2 * double(isPayer) - 1;        % +1 payer, -1 receiver

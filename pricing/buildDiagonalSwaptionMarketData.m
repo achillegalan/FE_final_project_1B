@@ -1,5 +1,5 @@
 function diagData = buildDiagonalSwaptionMarketData( ...
-    OIS_curve, EUR3M_curve, diagSwaptionsTable, isPayer)
+    OIS_curve, EUR3M_curve, diagSwaptionsTable, isPayer, isCS)
     
 %BUILDDIAGONALSWAPTIONMARKETDATA
 % Build market dataset on diagonal swaptions:
@@ -56,7 +56,7 @@ function diagData = buildDiagonalSwaptionMarketData( ...
         % Extract ATM forward quantities (S0, A, P0T) from curves.
         [~, qATM] = bachelierPSSwaptionPricerDiagonal( ...
             OIS_curve, EUR3M_curve, floatPaymentDates, fixedPaymentDates, 0.0, 0.0, ...
-            expiryYears(i), notionals, isPayer, "quarterly");
+            expiryYears(i), notionals, isPayer, "quarterly", isCS);
 
         K = qATM.forwardSwapRate;                         % ATM strike K = S0
 
