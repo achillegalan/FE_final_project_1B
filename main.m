@@ -139,23 +139,16 @@ fprintf("Unwind Swap NPV with CVA (500 bps)  : %.2f EUR\n", swap_unwind_quarterl
 fprintf('\n=== Task 5: Calibration Multicurve Swaption model ===\n\n')
 gammas = [0, 0.5, 1];
 
-diagSwaptions2022 = table( ...
-    ["1y"; "3y"; "5y"; "8y"; "10y"; "12y"; "15y"], ...
-    ["15y"; "12y"; "10y"; "7y"; "5y"; "3y"; "1y"], ...
-    [106.52; 91.17; 84.75; 78.38; 76.55; 76.63; 76.42], ...
-    'VariableNames', {'Expiry','Tenor','NormalVol_bps'});
-diagSwaptions2023 = table( ...
-    ["1y"; "3y"; "5y"; "8y"; "10y"; "12y"; "15y"], ...
-    ["15y"; "12y"; "10y"; "7y"; "5y"; "3y"; "1y"], ...
-    [95.95; 90.41; 84.93; 80.43; 78.77; 79.46; 79.97], ...
-    'VariableNames', {'Expiry','Tenor','NormalVol_bps'});
+% Build diagonal swaption quotes directly from the full market cubes.
+diagExpiry = [1; 3; 5; 8; 10; 12; 15];
+diagTenor  = [15; 12; 10; 7; 5; 3; 1];
+diagSwaptions2022 = buildDiagonalSwaptionTable(diagExpiry, diagTenor, "2022");
+diagSwaptions2023 = buildDiagonalSwaptionTable(diagExpiry, diagTenor, "2023");
 
 diagMkt2022 = buildDiagonalSwaptionMarketData(OIS_Boot, EUR3M_Boot, diagSwaptions2022, true);
 diagMkt2023 = buildDiagonalSwaptionMarketData(OIS_Boot_2, EUR3M_Boot_2, diagSwaptions2023, true);
 %disp(diagMkt2022.summary)
 %disp(diagMkt2023.summary)
-
-fprintf('\n-- Calibrazione MHW (min SSE prezzi) su diagonal swaptions --\n');
 
 for g = gammas
     [a22, b22, cal22] = calibrateMHWabDiagonal(OIS_Boot, EUR3M_Boot, diagMkt2022, g, true);
