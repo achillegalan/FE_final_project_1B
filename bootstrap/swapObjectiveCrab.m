@@ -1,23 +1,22 @@
-function value = swapObjectiveCrab(PN, settlementDate, maturityDate, swapRate, ...
+function value = swapObjectiveCrab(PN, settlementDate, maturityDate, ...
                                    knownDates, knownDisc, swapCache)
-% SWAPOBJECTIVECRAB Objective for swap bootstrap.
-% INPUTS:
-%   PN             - Candidate pseudo-discount factor at the swap maturity.
-%   settlementDate - Datetime object representing the curve settlement date.
-%   maturityDate   - Datetime object representing the swap maturity date.
-%   swapRate       - Quoted fixed swap rate as a decimal.
-%   knownDates     - Vector of datetime objects for known pseudo-curve nodes.
-%   knownDisc      - Vector of known pseudo-discount factors.
-%   oisInput       - Either:
-%                    (A) structure with OIS discount curve fields:
-%                        dates, discounts, settlementDate; or
-%                    (B) precomputed swap cache with fields:
-%                        floatStart, floatEnd, floatDelta,
-%                        oisDiscFloatEnd, fixedLegConst.
+%SWAPOBJECTIVECRAB Objective function for one pseudo-curve swap node.
 %
-% OUTPUTS:
-%   value - Difference between floating leg and fixed leg.
-%           The bootstrap solves value = 0 for PN.
+% INPUTS:
+%   PN             : Trial pseudo-discount factor at maturityDate.
+%   settlementDate : Curve settlement date.
+%   maturityDate   : Underlying swap maturity date (new node to solve).
+%   knownDates     : Already-bootstrapped pseudo-curve node dates.
+%   knownDisc      : Already-bootstrapped pseudo-curve discounts.
+%   swapCache      : Precomputed constants for this swap, with fields:
+%                      - floatStart       : floating period start dates
+%                      - floatEnd         : floating period end dates
+%                      - floatDelta       : ACT/360 accruals of floating leg
+%                      - oisDiscFloatEnd  : OIS DFs at floating payment dates
+%                      - fixedLegConst    : market fixed rate * fixed-leg annuity
+%
+% OUTPUT:
+%   value          : Residual (floating PV - fixed PV). Root at zero.
 
     floatStart = swapCache.floatStart;
     floatEnd = swapCache.floatEnd;

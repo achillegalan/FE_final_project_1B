@@ -1,23 +1,18 @@
 function [survivalProbabilities, hazardRates, cdsDates] = ...
     bootstrapSurvivalProbabilities(OIS_curve, cdsDates, cdsSpreads, LGD)
-%BOOTSTRAPSURVIVALPROBABILITIES Bootstrap survival probabilities from CDS spreads.
-%
-% Assumes CDS is paid quarterly and cdsDates ARE the quarterly payment
-% dates. Bootstraps one hazard rate per quarter, so there is no need to
-% evaluate survival at any date that is not already a tenor date.
+%BOOTSTRAPSURVIVALPROBABILITIES Bootstrap Q(0,T) from CDS spreads.
 %
 % INPUTS:
-%   OIS_curve  - OIS discount curve struct with settlementDate, dates,
-%                zeroRates.
-%   cdsDates   - Quarterly CDS payment dates (datetime column vector).
-%   cdsSpreads - CDS fair spreads in decimal form, e.g. 300 bp = 0.03.
-%                Either one per quarter or a single scalar (flat spread).
-%   LGD        - Loss given default in decimal form, e.g. 0.40.
+%   OIS_curve  : OIS curve struct with fields settlementDate, dates, zeroRates.
+%   cdsDates   : Quarterly CDS payment dates (datetime vector).
+%   cdsSpreads : CDS spreads in decimal form (e.g. 300 bp = 0.03).
+%                Can be scalar (flat across all dates) or one value per date.
+%   LGD        : Loss-given-default in decimal form (e.g. 0.40).
 %
 % OUTPUTS:
-%   survivalProbabilities - Q(0,T_i) bootstrapped at each quarterly date.
-%   hazardRates           - Piecewise-constant hazard rate for each quarter.
-%   cdsDates              - Echo of input cdsDates.
+%   survivalProbabilities : Bootstrapped Q(0,T_i) at each cds date.
+%   hazardRates           : Bucket hazard rates corresponding to each interval.
+%   cdsDates              : Echo of input cdsDates, returned as column vector.
 
 settleDate = OIS_curve.settlementDate;
 cdsDates = cdsDates(:);
@@ -64,7 +59,7 @@ end
 % -------------------------------------------------------------------------
 function value = cdsObjective(h, spread, LGD, accrualFracs, discounts, ...
     knownSurvival, prevSurv, dt)
-% Evaluation of the full contract mark-to-market up to bucket 'n'
+% Residual for the nth-bucket calibration equation (premium - protection).
 
 % Trial Q(T_n):
 Q_n = prevSurv * exp(-h * dt);

@@ -1,24 +1,22 @@
 function curve = bootstrapCrab3M(mkt, oisCurve, settlementDate, flag)
 
-%BOOTSTRAPCRAB3M Builds the Euribor 3M pseudo-discount curve using Crab bootstrap.
+%BOOTSTRAPCRAB3M Bootstrap Euribor 3M pseudo-discount curve (Crab-style).
 %
 % INPUTS:
-%   mkt            Market data table/struct with Term and MarketRate.
-%   oisCurve       OIS discount curve used for discounting.
-%   settlementDate Curve settlement date.
-%   flag           Optional logical flag; if true, plots OIS vs EUR3M zero rates.
+%   mkt            : Market data struct/table with fields Term, MarketRate.
+%                    Rates must be in decimal form.
+%                    Required instruments: '3 MO', futures 'ER*', swaps '* YR'.
+%   oisCurve       : OIS discounting curve struct (dates, discounts, settlementDate).
+%   settlementDate : Curve settlement date.
+%   flag           : Optional scalar logical/numeric flag; true enables plot.
 %
 % OUTPUT:
-%   curve          Struct containing:
-%                    - settlementDate: curve settlement date.
-%                    - dates: bootstrap node dates.
-%                    - discounts: pseudo-discount factors on bootstrap nodes.
-%                    - zeroRates: zero rates computed from bootstrap discounts.
-%                    - allDates: all relevant calculation dates used by the curve.
-%                    - allDiscounts: interpolated pseudo-discount factors on allDates.
-%                    - allZeroRates: zero rates computed from allDiscounts.
-%                    - nodesTable: table with Date, Discount, ZeroRate on bootstrap nodes.
-%                    - table: table with Date, Discount, ZeroRate on all calculation dates.
+%   curve          : Struct containing:
+%                      - settlementDate
+%                      - dates / discounts / zeroRates (bootstrap nodes)
+%                      - allDates / allDiscounts / allZeroRates (expanded grid)
+%                      - nodesTable (node summary)
+%                      - table (expanded-date summary)
 
     %% Default : no plot
     if nargin < 4 || isempty(flag)
@@ -102,21 +100,12 @@ function curve = bootstrapCrab3M(mkt, oisCurve, settlementDate, flag)
    %% 3. Swaps (sequential bootstrap; vectorized preprocessing only)
     swapIdx = find(endsWith(terms, "YR"));
 
-    if isempty(swapIdx)
-        error('bootstrapCrab3M:missingSwaps', ...
-            'No swap instruments (terms ending with "YR") found in market data.');
-    end
-
     % Vectorized extraction of swap terms and rates
     swapTerms = terms(swapIdx);
     swapRates = rates(swapIdx);
 
     % Vectorized parsing: "5 YR" -> 5
     swapYears = str2double(extractBefore(swapTerms, " YR"));
-    if any(isnan(swapYears))
-        error('bootstrapCrab3M:invalidSwapTerm', ...
-            'At least one swap term could not be parsed. Expected format like "5 YR".');
-    end
 
     % Vectorized maturity-date generation, then chronological ordering
     swapMatDates = arrayfun(@(y) add_target_months(settlementDate, 12*y, 'modifiedfollow'), swapYears);
@@ -165,8 +154,8 @@ function curve = bootstrapCrab3M(mkt, oisCurve, settlementDate, flag)
         swapCache.fixedLegConst = swapRate * sum(fixedDelta .* oisDiscFixedEnd);
 
         % Objective: solve for PN such that floating leg - fixed leg = 0.
-        obj = @(PN) swapObjectiveCrab(PN, settlementDate, ...
-            maturityDate, swapRate, curveDates, curveDisc, swapCache);
+         obj = @(PN) swapObjectiveCrab(PN, settlementDate, ...
+            maturityDate, curveDates, curveDisc, swapCache);
 
         % Initial PN guess from last known node using exponential decay.
         lastDisc = curveDisc(end);
@@ -228,10 +217,6 @@ function curve = bootstrapCrab3M(mkt, oisCurve, settlementDate, flag)
 
     %% Plot
     if doPlot
-        if ~isfield(oisCurve, 'zeroRates') || ~isfield(oisCurve, 'dates')
-            warning('bootstrapCrab3M:missingOISFields', ...
-                'Cannot plot OIS vs EUR3M: oisCurve must contain fields dates and zeroRates.');
-        else
             figure;
             plot(oisCurve.dates, 100 * oisCurve.zeroRates, '-o', ...
                 'LineWidth', 1.3, 'DisplayName', 'OIS');
@@ -243,6 +228,5 @@ function curve = bootstrapCrab3M(mkt, oisCurve, settlementDate, flag)
             ylabel('Zero Rate (%)');
             title(sprintf('OIS vs EUR3M Zero Rates (%s)', datestr(settlementDate, 'dd-mmm-yyyy')));
             legend('Location', 'best');
-        end
     end
 end
