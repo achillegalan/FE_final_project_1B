@@ -109,18 +109,29 @@ deliveryNames = {'PHYSICAL DELIVERY', 'CASH SETTLE'};
 for m = 1:numel(deliveryFlags)
     isPDMode = deliveryFlags(m);
     isCSMode = ~isPDMode; 
-
+    
     diagMkt2022 = buildDiagonalSwaptionMarketData( ...
         OIS_Boot, EUR3M_Boot, diagSwaptions2022, isPayer, isCSMode);
     diagMkt2023 = buildDiagonalSwaptionMarketData( ...
         OIS_Boot_2, EUR3M_Boot_2, diagSwaptions2023, isPayer, isCSMode);
-
+        
     [a22_c, b22_c, cal22_c] = arrayfun(@(g) calibrateMHWabDiagonal( ...
         OIS_Boot, EUR3M_Boot, diagMkt2022, g, isPayer, isPDMode), ...
         gammas, 'UniformOutput', false);
     [a23_c, b23_c, cal23_c] = arrayfun(@(g) calibrateMHWabDiagonal( ...
         OIS_Boot_2, EUR3M_Boot_2, diagMkt2023, g, isPayer, isPDMode), ...
         gammas, 'UniformOutput', false);
+        
+    % --- NUOVO: Salvataggio specifico dei parametri Physical Delivery per il Task 6 ---
+    if isPDMode
+        % Salviamo i parametri per gamma = 0 (indice 1)
+        hw_PD_2022.a = a22_c{1};
+        hw_PD_2022.sigma = b22_c{1};
+        
+        hw_PD_2023.a = a23_c{1};
+        hw_PD_2023.sigma = b23_c{1};
+    end
+    % ----------------------------------------------------------------------------------
 
     marketConvLabel = 'PS';
     if isCSMode
@@ -149,19 +160,45 @@ end
 
 %% TASK 6: CVA with tree
 fprintf('\n\n========= Task 6: Amortizing Swap Pricing with CVA with numerical technique =========\n')
-hw.a=0.001;
-hw.sigma=0.01;
+
+frequencies = {'quarterly', 'semiannual'};
+
+% ==========================================
 % 2022
-[NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw,...
-     swapData, OIS_Boot, EUR3M_Boot, settlementDate, fixedRate, ...
-     isPayer, 'quarterly', cdsSpreads(1), LGD);
-fprintf("NPV_riskfree 2022: %.2f EUR\n",NPV_riskfree);
-fprintf("CVA 2022: %.2f EUR\n",CVA);
-fprintf("NPV 2022: %.2f EUR\n",final_price);
-%2023
-[NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw,...
-     swapData, OIS_Boot_2, EUR3M_Boot_2, settlementDate_2, fixedRate, ...
-     isPayer, 'quarterly', cdsSpreads(1), LGD,knownFixing_2023);
-fprintf("NPV_riskfree 2023: %.2f EUR\n",NPV_riskfree);
-fprintf("CVA 2023: %.2f EUR\n",CVA);
-fprintf("NPV 2023: %.2f EUR\n",final_price);
+% ==========================================
+fprintf('\n--- REFERENCE DATE: 2022 ---\n');
+fprintf('Parametri HW (Physical Delivery, gamma=0) estratti dal Task 5 (2022): a = %.8f, sigma (b) = %.8f\n\n', hw_PD_2022.a, hw_PD_2022.sigma);
+
+for i = 1:length(frequencies)
+    freq = frequencies{i};
+    for j = 1:length(cdsSpreads)
+        cds = cdsSpreads(j);
+        
+        [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw_PD_2022,...
+             swapData, OIS_Boot, EUR3M_Boot, settlementDate, fixedRate, ...
+             isPayer, freq, cds, LGD);
+             
+        fprintf("Freq: %-10s | CDS: %3d bps | NPV_riskfree: %10.2f EUR | CVA: %10.2f EUR | Final NPV: %10.2f EUR\n", ...
+            freq, round(cds*10000), NPV_riskfree, CVA, final_price);
+    end
+end
+
+% ==========================================
+% 2023
+% ==========================================
+fprintf('\n--- REFERENCE DATE: 2023 ---\n');
+fprintf('Parametri HW (Physical Delivery, gamma=0) estratti dal Task 5 (2023): a = %.8f, sigma (b) = %.8f\n\n', hw_PD_2023.a, hw_PD_2023.sigma);
+
+for i = 1:length(frequencies)
+    freq = frequencies{i};
+    for j = 1:length(cdsSpreads)
+        cds = cdsSpreads(j);
+        
+        [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw_PD_2023,...
+             swapData, OIS_Boot_2, EUR3M_Boot_2, settlementDate_2, fixedRate, ...
+             isPayer, freq, cds, LGD, knownFixing_2023);
+             
+        fprintf("Freq: %-10s | CDS: %3d bps | NPV_riskfree: %10.2f EUR | CVA: %10.2f EUR | Final NPV: %10.2f EUR\n", ...
+            freq, round(cds*10000), NPV_riskfree, CVA, final_price);
+    end
+end

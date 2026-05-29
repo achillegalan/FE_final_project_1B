@@ -24,14 +24,14 @@ function [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw,...
     allAccStarts = swapData.AccrualStart;
     allAccEnds = swapData.AccrualEnd;
     allNotionals = swapData.Notional;
-
+    
     % Isolate strictly future cash flows
     idx_future = find(allPayDates > settlementDate);
     if isempty(idx_future)
         NPV_riskfree = 0; CVA = 0; final_price = 0; 
         return;
     end
-
+    
     % ---------------------------------------------------------------------
     % 2. TIME GRID SETUP
     % ---------------------------------------------------------------------
@@ -39,33 +39,56 @@ function [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw,...
     T_max = yearfrac(settlementDate, max(allPayDates(idx_future)), 3);
     N = ceil(T_max / dt);
     time_grid = (0:N)' * dt;
-
+    
     % ---------------------------------------------------------------------
-    % 3. TREE GEOMETRY
+    % 3. TREE GEOMETRY (con limiti per a=0)
     % ---------------------------------------------------------------------
-    a = hw.a; 
+    a = hw.a;
+    tol = 1e-6;
+    if abs(a) < tol
+        a = 0;
+    end
     sigma = hw.sigma;
     dx = sigma * sqrt(3 * dt);
-    j_max = ceil(0.184 / (a * dt));
+    
+    % Cap j_max to prevent 'Inf' when a=0 (Ho-Lee limit)
+    if a == 0
+        j_max = N + 1; % Lasciamo espandere l'albero liberamente senza troncare
+    else
+        j_max = min(N + 1, ceil(0.184 / (a * dt))); 
+    end
+    
     num_nodes = 2 * j_max + 1;
     j_vec = (j_max:-1:-j_max)';
     x_space = j_vec * dx;
-
+    
     pu = zeros(num_nodes, 1); pm = zeros(num_nodes, 1); pd = zeros(num_nodes, 1);
     idx_u = zeros(num_nodes, 1); idx_m = zeros(num_nodes, 1); idx_d = zeros(num_nodes, 1);
-
+    
     for k = 1:num_nodes
         j = j_vec(k);
+        
+        % Boundaries safely handled for a=0 limit
         if j == j_max
-            pu(k) = 7/6 + 0.5 * (a^2 * j^2 * dt^2 - 3 * a * j * dt);
-            pm(k) = -1/3 - a^2 * j^2 * dt^2 + 2 * a * j * dt;
-            pd(k) = 1/6 + 0.5 * (a^2 * j^2 * dt^2 - a * j * dt);
-            idx_u(k) = k; idx_m(k) = k+1; idx_d(k) = k+2;
+            if a == 0
+                pu(k) = 0; pm(k) = 1; pd(k) = 0; 
+                idx_u(k) = k; idx_m(k) = k; idx_d(k) = k;
+            else
+                pu(k) = 7/6 + 0.5 * (a^2 * j^2 * dt^2 - 3 * a * j * dt);
+                pm(k) = -1/3 - a^2 * j^2 * dt^2 + 2 * a * j * dt;
+                pd(k) = 1/6 + 0.5 * (a^2 * j^2 * dt^2 - a * j * dt);
+                idx_u(k) = k; idx_m(k) = k+1; idx_d(k) = k+2;
+            end
         elseif j == -j_max
-            pu(k) = 1/6 + 0.5 * (a^2 * j^2 * dt^2 + a * j * dt);
-            pm(k) = -1/3 - a^2 * j^2 * dt^2 - 2 * a * j * dt;
-            pd(k) = 7/6 + 0.5 * (a^2 * j^2 * dt^2 + 3 * a * j * dt);
-            idx_u(k) = k-2; idx_m(k) = k-1; idx_d(k) = k;
+            if a == 0
+                pu(k) = 0; pm(k) = 1; pd(k) = 0; 
+                idx_u(k) = k; idx_m(k) = k; idx_d(k) = k;
+            else
+                pu(k) = 1/6 + 0.5 * (a^2 * j^2 * dt^2 + a * j * dt);
+                pm(k) = -1/3 - a^2 * j^2 * dt^2 - 2 * a * j * dt;
+                pd(k) = 7/6 + 0.5 * (a^2 * j^2 * dt^2 + 3 * a * j * dt);
+                idx_u(k) = k-2; idx_m(k) = k-1; idx_d(k) = k;
+            end
         else
             pu(k) = 1/6 + 0.5 * (a^2 * j^2 * dt^2 + a * j * dt);
             pm(k) = 2/3 - a^2 * j^2 * dt^2;
@@ -73,18 +96,18 @@ function [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw,...
             idx_u(k) = k-1; idx_m(k) = k; idx_d(k) = k+1;
         end
     end
-
+    
     % ---------------------------------------------------------------------
     % 4. FORWARD INDUCTION (STATE PROBABILITIES)
     % ---------------------------------------------------------------------
     Q = zeros(num_nodes, N+1);
     mid_idx = j_max + 1;
     Q(mid_idx, 1) = 1.0;
-
+    
     % Precompute Market Discounts for the Grid Dates
     dates_grid = settlementDate + days(round(time_grid * 365));
     P_OIS_grid = getTargetDF(settlementDate, OIS_curve.dates, OIS_curve.zeroRates, dates_grid);
-
+    
     for n = 1:N
         for k = 1:num_nodes
             if Q(k, n) > 0
@@ -95,14 +118,15 @@ function [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw,...
             end
         end
     end
-
+    
     % ---------------------------------------------------------------------
-    % 5. MAP CASH FLOWS TO TREE
+    % 5. MAP CASH FLOWS TO TREE (Con logica Fix Date e calendari reali)
     % ---------------------------------------------------------------------
     CF_list = struct('is_det', {}, 'amount', {}, 'pay_step', {}, 'reset_step', {}, ...
                      'N', {}, 'delta', {}, 'reset_time_frac', {}, 'pay_time_frac', {}, ...
-                     'underlying_end_frac', {});
-
+                     'underlying_end_frac', {}, 'exact_date_reset', {}, ...
+                     'exact_date_end', {}, 'exact_date_pay', {});
+                     
     for c = 1:length(idx_future)
         idx = idx_future(c);
         
@@ -123,16 +147,19 @@ function [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw,...
             t_reset = t_accStart;
         end
         
-        % Assess Determinism
+        % Calcolo esatto della Fixing Date (2 bd prima dello start)
+        fixingDate = add_target_business_days(t_reset, -2);
+        
+        % Valutazione sulla fixingDate: è un tasso storicamente fissato?
         is_det = false;
         det_rate = 0;
         
-        if t_reset <= settlementDate
+        if fixingDate <= settlementDate
             is_det = true;
             if nargin >= 11 && ~isempty(knownFixing) && ~isnan(knownFixing.resetRate)
                 det_rate = knownFixing.resetRate;
             else
-                % Implied forward rate fallback
+                % Implied forward rate fallback se il fixing reale non è fornito
                 P_E_start = getTargetDF(settlementDate, EUR3M_curve.dates, EUR3M_curve.zeroRates, t_reset);
                 P_E_end = getTargetDF(settlementDate, EUR3M_curve.dates, EUR3M_curve.zeroRates, t_accEnd);
                 det_rate = (P_E_start / P_E_end - 1) / delta;
@@ -152,8 +179,15 @@ function [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw,...
         new_cf.delta = delta;
         new_cf.reset_time_frac = reset_time;
         new_cf.pay_time_frac = pay_time;
-        new_cf.underlying_end_frac = reset_time + 0.25; % Standard 3M tenor
-
+        
+        % Calcolo della yearfrac reale per il pricing analitico B(t,T)
+        new_cf.underlying_end_frac = yearfrac(settlementDate, t_accEnd, 3);
+        
+        % Salvataggio date esatte per estrazione precisa dei market discount factors
+        new_cf.exact_date_reset = t_reset;
+        new_cf.exact_date_end   = t_accEnd;
+        new_cf.exact_date_pay   = t_pay;
+        
         if is_det
             if isPayer
                 new_cf.amount = N_notional * delta * (det_rate - strike);
@@ -166,19 +200,24 @@ function [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw,...
         
         CF_list(c) = new_cf;
     end
-
+    
     % ---------------------------------------------------------------------
     % 6. BACKWARD INDUCTION (NPV & EPE)
     % ---------------------------------------------------------------------
     V = zeros(num_nodes, 1);
     EPE = zeros(N+1, 1);
     
-    B_hw = @(t, T) (1 - exp(-a * (T - t))) / a;
-    phi_hw = @(t) (sigma^2 / (2*a)) * (1 - exp(-2*a*t));
+    % L'Hôpital's continuous limits for a=0
+    if a == 0
+        B_hw = @(t, T) (T - t);
+        phi_hw = @(t) sigma^2 * t;
+    else
+        B_hw = @(t, T) (1 - exp(-a * (T - t))) / a;
+        phi_hw = @(t) (sigma^2 / (2*a)) * (1 - exp(-2*a*t));
+    end
 
     for n = (N+1):-1:1
-        t = (n-1) * dt;
-        
+                
         % Discount the Continuation Value (except at the exact end)
         if n <= N
             discount = P_OIS_grid(n+1) / P_OIS_grid(n); % Deterministic OIS
@@ -198,14 +237,15 @@ function [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw,...
             if ~CF_list(c).is_det && CF_list(c).reset_step == n
                 t1 = CF_list(c).reset_time_frac;
                 t2 = CF_list(c).underlying_end_frac;
-                t_pay = CF_list(c).pay_time_frac;
                 
                 % Analytical Bond pricing components
                 B_term2 = B_hw(t1, t2);
+                phi_t1 = phi_hw(t1);
                 
-                date1 = settlementDate + days(round(t1*365));
-                date2 = settlementDate + days(round(t2*365));
-                date_pay = settlementDate + days(round(t_pay*365));
+                % Date REALI dal termsheet per calcolare i market DF corretti
+                date1 = CF_list(c).exact_date_reset;
+                date2 = CF_list(c).exact_date_end;
+                date_pay = CF_list(c).exact_date_pay;
                 
                 P_OIS_0_t1  = getTargetDF(settlementDate, OIS_curve.dates, OIS_curve.zeroRates, date1);
                 P_OIS_0_pay = getTargetDF(settlementDate, OIS_curve.dates, OIS_curve.zeroRates, date_pay);
@@ -213,22 +253,20 @@ function [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw,...
                 P_EUR_0_t1  = getTargetDF(settlementDate, EUR3M_curve.dates, EUR3M_curve.zeroRates, date1);
                 P_EUR_0_t2  = getTargetDF(settlementDate, EUR3M_curve.dates, EUR3M_curve.zeroRates, date2);
                 
-                phi_t1 = phi_hw(t1);
-                
                 % OIS is purely deterministic (Gamma = 0)
                 P_OIS_node_pay = (P_OIS_0_pay / P_OIS_0_t1); 
                 
                 % Euribor holds the full HW volatility
                 P_EUR_node_t2 = (P_EUR_0_t2 / P_EUR_0_t1) * exp(-B_term2 * x_space - 0.5 * B_term2^2 * phi_t1);
                 
-                % Dynamic year fraction based on exact grid dates
-                delta_basis = yearfrac(date1, date2, 2); % ACT/360
+                % Dynamic year fraction basata su ACT/360 esatta precalcolata
+                delta_basis = CF_list(c).delta; 
                 L_node = (1/delta_basis) * (1 ./ P_EUR_node_t2 - 1);
                 
                 if isPayer
-                    CF_amt = CF_list(c).N * CF_list(c).delta * (L_node - strike);
+                    CF_amt = CF_list(c).N * delta_basis * (L_node - strike);
                 else
-                    CF_amt = CF_list(c).N * CF_list(c).delta * (strike - L_node);
+                    CF_amt = CF_list(c).N * delta_basis * (strike - L_node);
                 end
                 
                 V = V + CF_amt .* P_OIS_node_pay;
@@ -260,5 +298,4 @@ function [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw,...
     CVA = LGD * sum(CVAsurvProbs .* EPE_at_cds);
     
     final_price = NPV_riskfree - CVA;
-
 end
