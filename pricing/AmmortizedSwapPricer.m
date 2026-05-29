@@ -13,20 +13,11 @@ function swapPrice = AmmortizedSwapPricer( ...
 %   settlementDate  Pricing date; only PayDate > valuationDate are considered.
 %   fixedRate       Fixed coupon rate, in decimal form.
 %   resetType       'quarterly' or 'semiannual'. Default: 'quarterly'.
-%   knownFixing     Optional struct with resetStartDate and resetRate for
+%   knownFixing     Struct with fixingDate and resetRate for
 %                   already-fixed coupons.
 %
 % Outputs:
 %   swapPrice       Bank MtM: receive floating, pay fixed.
-
-% Defaults
-if nargin < 6 || isempty(resetType)
-    resetType = 'quarterly';
-end
-if nargin < 7 || isempty(knownFixing)
-    knownFixing = struct('resetStartDate', NaT, 'resetRate', NaN);
-end
-
 
 % Extract and shape data
 paymentDates       = swapData.PayDate(:);
@@ -39,43 +30,46 @@ zeroRates       = oisCurve.zeroRates(:);
 pseudocurveDates = pseudoCurve.dates(:);
 pseudozeroRates  = pseudoCurve.zeroRates(:);
 
-knownDates = knownFixing.resetStartDate(:);
+knownDates = knownFixing.fixingDate(:);
 knownRates = knownFixing.resetRate(:);
 
-%% Map reset dates on the FULL schedule first
+%% Map reset dates on the full schedule
 resetType = lower(string(strtrim(resetType)));
 nCoupons = numel(paymentDates);
 fullIdx = (1:nCoupons).';
 
 switch resetType
     case "quarterly"
-        resetStartFull = accrualStartDates;
-        resetEndFull   = accrualEndDates;
+        calcStartFull = accrualStartDates;
+        calcEndFull   = accrualEndDates;
 
     case "semiannual"
         % convention: (1,2), (3,4), ... share the first 3M fixing.
         pairStartIdxFull = 2 * ceil(fullIdx / 2) - 1;   % 1,1,3,3,...
-        resetStartFull = accrualStartDates(pairStartIdxFull);
-        resetEndFull   = accrualEndDates(pairStartIdxFull);
-
-    otherwise
-        error('AmmortizedSwapPricer:InvalidResetType', ...
-            'resetType must be ''quarterly'' or ''semiannual''.');
+        calcStartFull = accrualStartDates(pairStartIdxFull);
+        calcEndFull   = accrualEndDates(pairStartIdxFull);
 end
 
-%% Build floating rates on the FULL schedule, then cut valuation-relevant cash flows
+% fixing date 2bd prior
+fixingDateFull = add_target_business_days(calcStartFull, -2);
+
+%% Floating leg
 floatingRatesFull = NaN(nCoupons, 1);
 
 for k = 1:nCoupons
-    if resetStartFull(k) < settlementDate
-        idxKnown = find(knownDates == resetStartFull(k), 1);
-        if ~isempty(idxKnown) && ~isnan(knownRates(idxKnown))
-            floatingRatesFull(k) = knownRates(idxKnown);
-        end
+    % Coupons already paid at valuation date are irrelevant for MtM.
+    if paymentDates(k) <= settlementDate
+        continue;
+    end
+
+    if fixingDateFull(k) <= settlementDate
+        idxKnown = find(knownDates == fixingDateFull(k), 1);
+        floatingRatesFull(k) = knownRates(idxKnown);
     else
-        Pstart = getTargetDF(settlementDate, pseudocurveDates, pseudozeroRates, resetStartFull(k));
-        Pend   = getTargetDF(settlementDate, pseudocurveDates, pseudozeroRates, resetEndFull(k));
-        deltaReset = yearfrac(resetStartFull(k), resetEndFull(k), 2); % ACT/360 on reset period
+        % Future fixing: project from pseudo-curve
+        Pstart = getTargetDF(settlementDate, pseudocurveDates, pseudozeroRates, calcStartFull(k));
+        Pend   = getTargetDF(settlementDate, pseudocurveDates, pseudozeroRates, calcEndFull(k));
+        deltaReset = yearfrac(calcStartFull(k), calcEndFull(k), 2); % ACT/360
         floatingRatesFull(k) = (Pstart / Pend - 1) / deltaReset;
     end
 end

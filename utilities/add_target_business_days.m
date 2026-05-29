@@ -18,16 +18,20 @@ end
 
 d_out = d_in;
 step = sign(n);
-remaining = abs(n);
+nSteps = abs(n);
+isDt = isdatetime(d_out);
 
-while remaining > 0
-    if isdatetime(d_out)
-        d_out = d_out + caldays(step);
-    else
-        d_out = d_out + step;
-    end
-    if is_target_business_day(d_out)
-        remaining = remaining - 1;
+for i = 1:numel(d_out)
+    remaining = nSteps;
+    while remaining > 0
+        if isDt
+            d_out(i) = d_out(i) + caldays(step);
+        else
+            d_out(i) = d_out(i) + step;
+        end
+        if is_target_business_day(d_out(i))
+            remaining = remaining - 1;
+        end
     end
 end
 
