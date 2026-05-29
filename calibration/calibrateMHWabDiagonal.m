@@ -115,10 +115,6 @@ function [modelVec, flag] = modelPricesFromParams(aTry, bTry)
             matDate = add_target_months(exDate, round(12 * tenorYears(i)), 'modifiedfollow');
             % Task 5 convention: floating quarterly, fixed annual.
             floatSched = makeSchedule(exDate, matDate, 3, 'modifiedfollow');
-            % floatSched = makeSchedule(exDate, matDate, 6, 'modifiedfollow'); 
-            % % Paper requires Euribor 6m floating frequency.
-            % DIPENDE DA COSA RIPONDE NELLA MAIL
-            % Paper convention: Euribor 6M floating leg and annual fixed leg.
             fixedSched = makeSchedule(exDate, matDate, 12, 'modifiedfollow');
             floatPayDates = floatSched(2:end);
             fixedPayDates = fixedSched(2:end);
