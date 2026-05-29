@@ -120,7 +120,7 @@ function [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw,...
     end
     
     % ---------------------------------------------------------------------
-    % 5. MAP CASH FLOWS TO TREE (Con logica Fix Date e calendari reali)
+    % 5. MAP CASH FLOWS TO TREE
     % ---------------------------------------------------------------------
     CF_list = struct('is_det', {}, 'amount', {}, 'pay_step', {}, 'reset_step', {}, ...
                      'N', {}, 'delta', {}, 'reset_time_frac', {}, 'pay_time_frac', {}, ...
@@ -225,14 +225,9 @@ function [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw,...
             V = discount .* EV;
         end
         
-        % 1. Inject fully deterministic cash flows hitting this exact payment date
-        for c = 1:length(CF_list)
-            if CF_list(c).is_det && CF_list(c).pay_step == n
-                V = V + CF_list(c).amount;
-            end
-        end
-        
-        % 2. Evaluate and Inject Stochastic Cash Flows fixing at this exact date
+        % CORRECTION 1: Inject Stochastic Cash Flows BEFORE measuring EPE
+        % This ensures the value of the locked-in floating cash flow is recorded 
+        % in the EPE on the exact reset_step so we can carry it forward later.
         for c = 1:length(CF_list)
             if ~CF_list(c).is_det && CF_list(c).reset_step == n
                 t1 = CF_list(c).reset_time_frac;
@@ -273,14 +268,54 @@ function [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw,...
             end
         end
         
-        % 3. Measure EPE _after_ resetting CFs are injected
-        % EPE(t) requires multiplication by P_OIS(0, t) to return Present Value
+        % CORRECTION 2: Measure EPE BEFORE deterministic cash flows are injected
+        % (Right-Limit: evaluate exposure immediately *after* today's payment is made)
+        % V holds future cash flows, but NOT the deterministic CF paid today.
         Exposure = max(V, 0);
         EPE(n) = P_OIS_grid(n) * sum(Q(:, n) .* Exposure);
+        
+        % CORRECTION 3: Inject fully deterministic cash flows AFTER EPE is measured
+        % Now V includes today's payment, so as the tree steps back to yesterday,
+        % the exposure will accurately reflect that the money is owed again.
+        for c = 1:length(CF_list)
+            if CF_list(c).is_det && CF_list(c).pay_step == n
+                V = V + CF_list(c).amount;
+            end
+        end
     end
     
     NPV_riskfree = V(mid_idx);
     
+    % =========================================================================
+    % 6.5 POST-PROCESSING: THE EXPOSURE INTERPOLATION HEURISTIC
+    % =========================================================================
+    % The raw EPE array drops to 0 between reset_step and pay_step for floating
+    % cash flows. We manually "carry forward" the valid EPE calculated at the reset_step.
+    
+    EPE_patched = EPE; 
+    
+    for c = 1:length(CF_list)
+        if ~CF_list(c).is_det
+            r_step = CF_list(c).reset_step;
+            p_step = CF_list(c).pay_step;
+            
+            % Ensure indices are within bounds
+            if r_step >= 1 && r_step <= length(EPE)
+                % The valid exposure is exactly at the reset step
+                valid_EPE = EPE(r_step);
+                
+                % Fill the "blind spot" from just after the reset up to the payment
+                for n_idx = (r_step + 1) : min(p_step, length(EPE))
+                    % Only overwrite if the patched value is higher 
+                    % (prevents accidentally overwriting overlapping cash flows)
+                    EPE_patched(n_idx) = max(EPE_patched(n_idx), valid_EPE);
+                end
+            end
+        end
+    end
+    
+    EPE = EPE_patched;
+
     % ---------------------------------------------------------------------
     % 7. CVA INTEGRATION
     % ---------------------------------------------------------------------
