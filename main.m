@@ -203,5 +203,3 @@ for i = 1:length(frequencies)
             freq, round(cds*10000), NPV_riskfree, CVA, final_price);
     end
 end
-
-toc
