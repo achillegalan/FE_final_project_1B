@@ -51,9 +51,6 @@ function diagData = buildDiagonalSwaptionMarketData( ...
         floatSched = makeSchedule(expiryDates(i), maturityDates(i), floatStepMonths, 'modifiedfollow');
         fixedSched = makeSchedule(expiryDates(i), maturityDates(i), 12, 'modifiedfollow');
 
-        % floatStepMonths = 6; % Paper requires Euribor 6m floating frequency. 
-        % SE CAMBIAMO QUESTO VA CAMBIATO ANCHE 'SEMIANNUAL' NELLA FUNZ DI BACHELIER   
-
         floatPaymentDates = floatSched(2:end);            % remove start date
         fixedPaymentDates = fixedSched(2:end);            % remove start date
         notionals = ones(numel(floatPaymentDates), 1);    % unit notional (calibration scale)
@@ -71,8 +68,9 @@ function diagData = buildDiagonalSwaptionMarketData( ...
 
         % ATM Bachelier price:
         % V_ATM = P(0,T) * A_fwd(0) * sigma_N * sqrt(T) / sqrt(2*pi)
+        TTM_act365 = yearfrac(settlementDate, expiryDates(i), 3);
         marketPrice(i) = dfExpiry(i) * annuityFwd(i) * volSwap(i) * ...
-            sqrt(expiryYears(i)) / sqrt(2*pi);
+            sqrt(TTM_act365) / sqrt(2*pi);
     end
 
     summary = table( expiryYears, tenorYears, volSwap, ...

@@ -3,6 +3,7 @@
 % Achille Galante, Salvatore Ippolito, Ginevra Angelica Marelli
 clc
 clear all
+tic
 rng(1234);
 ActiveFolders()
 
@@ -202,3 +203,5 @@ for i = 1:length(frequencies)
             freq, round(cds*10000), NPV_riskfree, CVA, final_price);
     end
 end
+
+toc
