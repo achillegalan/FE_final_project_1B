@@ -118,7 +118,11 @@ for i = 1:length(normalVol.tenorsNum)
     vanillaBPVs(i) = sum(vanillaYearFracs(1:idx) .* vanillaFwdDiscounts(1:idx));
 end
 
-interpolated_sigma = interp1(vanillaBPVs, volsAtExpiry, ammortizedBPV, 'linear', 'extrap');
+bpvMin = min(vanillaBPVs);
+bpvMax = max(vanillaBPVs);
+bpvQuery = min(max(ammortizedBPV, bpvMin), bpvMax);  % clamp: no extrapolation
+
+interpolated_sigma = interp1(vanillaBPVs, volsAtExpiry, bpvQuery, 'linear');
 
 % =========================================================================
 % Actual Swaption formula (Bachelier)
