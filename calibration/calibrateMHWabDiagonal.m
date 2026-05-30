@@ -1,5 +1,5 @@
 function [aCal, bCal, calib] = calibrateMHWabDiagonal( ...
-    OIS_curve, EUR3M_curve, diagData, gamma, isPayer, isPD)
+    OIS_curve, EUR3M_curve, diagData, gamma, isPayer, isCS)
 %CALIBRATEMHWABDIAGONAL Calibra i parametri (a,b) del modello MHW a gamma fissato.
 %
 % Minimizza la funzione errore del paper (eq. 4.1):
@@ -13,6 +13,8 @@ function [aCal, bCal, calib] = calibrateMHWabDiagonal( ...
 %                           ExpiryYears, TenorYears, StrikeATM, MarketPrice).
 %   gamma                   Parametro gamma fissato in [0,1].
 %   isPayer                 true/false (default true).
+%   isCS                    true for cash settle, false for physical delivery
+%                           (default true).
 %
 % OUTPUT
 %   aCal, bCal              Parametri calibrati.
@@ -21,18 +23,8 @@ function [aCal, bCal, calib] = calibrateMHWabDiagonal( ...
     if nargin < 5 || isempty(isPayer)
         isPayer = true;
     end
-    if nargin < 6 || isempty(isPD)
-        isPD = true;
-    end
-
-    if gamma < 0 || gamma > 1
-        error('calibrateMHWabDiagonal:GammaOutOfRange', ...
-            'gamma must be in [0,1].');
-    end
-
-    if ~isstruct(diagData) || ~isfield(diagData, 'summary')
-        error('calibrateMHWabDiagonal:InvalidMarketData', ...
-            'diagData must be a struct with field .summary.');
+    if nargin < 6 || isempty(isCS)
+        isCS = true;
     end
 
     % Initial guess
@@ -46,9 +38,22 @@ function [aCal, bCal, calib] = calibrateMHWabDiagonal( ...
 
     n = numel(expiryYears);
     settleDate = OIS_curve.settlementDate;
+    
+    % Cache schedule-related objects that do not depend on (a,b).
+    floatPayDatesCache = cell(n, 1);
+    fixedPayDatesCache = cell(n, 1);
+    for i = 1:n
+        exDate = add_target_months(settleDate, round(12 * expiryYears(i)), 'modifiedfollow');
+        matDate = add_target_months(exDate, round(12 * tenorYears(i)), 'modifiedfollow');
+        % Task 5 convention: floating quarterly, fixed annual.
+        floatSched = makeSchedule(exDate, matDate, 3, 'modifiedfollow');
+        fixedSched = makeSchedule(exDate, matDate, 12, 'modifiedfollow');
+        floatPayDatesCache{i} = floatSched(2:end);
+        fixedPayDatesCache{i} = fixedSched(2:end);
+    end
 
     % Constrained optimization: enforce a,b > 0 with lower bounds.
-    lb = [eps, eps];
+    lb = [0, 0];
     ub = [];
     
     opts = optimoptions('fmincon','Display','off','Algorithm','sqp', ...
@@ -111,17 +116,12 @@ function [modelVec, flag] = modelPricesFromParams(aTry, bTry)
 
     for i = 1:n
         try
-            exDate = add_target_months(settleDate, round(12 * expiryYears(i)), 'modifiedfollow');
-            matDate = add_target_months(exDate, round(12 * tenorYears(i)), 'modifiedfollow');
-            % Task 5 convention: floating quarterly, fixed annual.
-            floatSched = makeSchedule(exDate, matDate, 3, 'modifiedfollow');
-            fixedSched = makeSchedule(exDate, matDate, 12, 'modifiedfollow');
-            floatPayDates = floatSched(2:end);
-            fixedPayDates = fixedSched(2:end);
+            floatPayDates = floatPayDatesCache{i};
+            fixedPayDates = fixedPayDatesCache{i};
 
             modelVec(i) = model_multiHJM_Price( ...
                 OIS_curve, EUR3M_curve, floatPayDates, fixedPayDates, ...
-                strikeATM(i), expiryYears(i), aTry, bTry, gamma, isPayer, isPD);
+                strikeATM(i), expiryYears(i), aTry, bTry, gamma, isPayer, isCS);
         catch
             flag = false;
             return;

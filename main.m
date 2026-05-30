@@ -93,71 +93,72 @@ normalVol_2 = loadSwaptionVolsUnwinding();
 printCVATable('2023', swapUnwindPrice, cdsSpreads, hazardNames, ...
     CVA_2023, CVA_det_2023, CVA_stoch_2023, NPV_2023);
 
-%% TASK 5: Calibration
-fprintf('\n\n========= Task 5: Calibration Multicurve Swaption model =========\n')
+%% TASK 5: MHW calibration (CS only)
+fprintf('\n\n========= Task 5: Calibration MHW =========\n');
 gammas = [0, 0.5, 1];
+isPayer = true;
+isCS = true;    % true  -> CS convention in market data builder
 
-% Build diagonal swaption quotes directly from the full market cubes.
 diagExpiry = [1; 3; 5; 8; 10; 12; 15];
 diagTenor  = [15; 12; 10; 7; 5; 3; 1];
+
+yearLabels = ["2022","2023"];
+OISBoots   = {OIS_Boot, OIS_Boot_2};
+EURBoots   = {EUR3M_Boot, EUR3M_Boot_2};
+
+% Build diagonal quotes and market calibration data once per year.
 diagSwaptions2022 = buildDiagonalSwaptionTable(diagExpiry, diagTenor, "2022");
 diagSwaptions2023 = buildDiagonalSwaptionTable(diagExpiry, diagTenor, "2023");
+diagSwaptions = {diagSwaptions2022, diagSwaptions2023};
 
-isPayer = true;
-deliveryFlags = [true, false];  % true = Physical Delivery, false = Cash Settle
+diagMkt2022 = buildDiagonalSwaptionMarketData(OIS_Boot,   EUR3M_Boot,   diagSwaptions2022, isPayer, isCS);
+diagMkt2023 = buildDiagonalSwaptionMarketData(OIS_Boot_2, EUR3M_Boot_2, diagSwaptions2023, isPayer, isCS);
+diagMkt = {diagMkt2022, diagMkt2023};
 
-deliveryNames = {'PHYSICAL DELIVERY', 'CASH SETTLE'};
-for m = 1:numel(deliveryFlags)
-    isPDMode = deliveryFlags(m);
-    isCSMode = ~isPDMode; 
-    
-    diagMkt2022 = buildDiagonalSwaptionMarketData( ...
-        OIS_Boot, EUR3M_Boot, diagSwaptions2022, isPayer, isCSMode);
-    diagMkt2023 = buildDiagonalSwaptionMarketData( ...
-        OIS_Boot_2, EUR3M_Boot_2, diagSwaptions2023, isPayer, isCSMode);
-        
-    [a22_c, b22_c, cal22_c] = arrayfun(@(g) calibrateMHWabDiagonal( ...
-        OIS_Boot, EUR3M_Boot, diagMkt2022, g, isPayer, isPDMode), ...
+        % %% 1. OBJECTIVE LANDSCAPE PLOT (only gamma = 0, year = 2022)
+        % aVec = linspace(0, 10, 50);
+        % bVec = linspace(0, 10, 50);
+        % 
+        % [~, ~, ~, minPoint] = plotMHWabObjectiveLandscape( ...
+        %     OISBoots{1}, EURBoots{1}, diagMkt{1}, 0, isPayer, aVec, bVec, isCS);
+        % 
+        % % 2. HYBRID CALIBRATION (only gamma = 0, year = 2022)
+        % [aHybrid22, bHybrid22, calHybrid22] = calibrateMHWabDiagonalHybrid( ...
+        %     OISBoots{1}, EURBoots{1}, diagMkt{1}, 0, isPayer, isCS);
+        % 
+        % fprintf('[Hybrid - 2022, gamma=0, CS] a=%.8f, b=%.8f, SSE=%.6e, RMSE=%.6e\n', ...
+        %     aHybrid22, bHybrid22, calHybrid22.sse, calHybrid22.rmse);
+
+%% 3. LOCAL CALIBRATION (all 6 cases: 3 gammas x 2 years, CS only)
+a = zeros(2, numel(gammas));
+b = zeros(2, numel(gammas));
+sse = zeros(2, numel(gammas));
+
+for y = 1:numel(OISBoots)
+    [aC, bC, calC] = arrayfun(@(g) calibrateMHWabDiagonal( ...
+        OISBoots{y}, EURBoots{y}, diagMkt{y}, g, isPayer, isCS), ...
         gammas, 'UniformOutput', false);
-    [a23_c, b23_c, cal23_c] = arrayfun(@(g) calibrateMHWabDiagonal( ...
-        OIS_Boot_2, EUR3M_Boot_2, diagMkt2023, g, isPayer, isPDMode), ...
-        gammas, 'UniformOutput', false);
-        
-    % --- NUOVO: Salvataggio specifico dei parametri Physical Delivery per il Task 6 ---
-    if isPDMode
-        % Salviamo i parametri per gamma = 0 (indice 1)
-        hw_PD_2022.a = a22_c{1};
-        hw_PD_2022.sigma = b22_c{1};
-        
-        hw_PD_2023.a = a23_c{1};
-        hw_PD_2023.sigma = b23_c{1};
-    end
-    % ----------------------------------------------------------------------------------
 
-    marketConvLabel = 'PS';
-    if isCSMode
-        marketConvLabel = 'CS';
-    end
-    fprintf('\n%s  [market convention: %s]\n', ...
-        deliveryNames{m}, marketConvLabel);
-    fprintf('%-8s | %-37s | %-37s\n', 'Gamma', '2022 (a, b, SSE)', '2023 (a, b, SSE)');
-    fprintf('%s\n', repmat('-', 1, 90));
-    for k = 1:numel(gammas)
-        fprintf('%-8.2f | a=%10.8f, b=%10.8f, SSE=%10.3e | a=%10.8f, b=%10.8f, SSE=%10.3e\n', ...
-            gammas(k), a22_c{k}, b22_c{k}, cal22_c{k}.sse, a23_c{k}, b23_c{k}, cal23_c{k}.sse);
-    end
+    a(y,:) = cell2mat(aC);
+    b(y,:) = cell2mat(bC);
+    sse(y,:) = cellfun(@(c) c.sse, calC);
 end
-%% Landscape della funzione obiettivo (Task 5)
-% gammaPlot = 0.5;
-% % passata veloce
-% aVec = linspace(1e-3, 20, 50);
-% bVec = linspace(1e-3, 20, 50);
-% 
-% [A,B,SSE,minPoint] = plotMHWabObjectiveLandscape( ...
-%     OIS_Boot, EUR3M_Boot, diagMkt2022, 0.5, true, aVec, bVec);
 
-%fprintf('Grid min: a=%.6f, b=%.6f, SSE=%.6e\n', ...
-    %minPoint.a, minPoint.b, minPoint.sse);
+calibTableCS = table( repelem([2022; 2023], numel(gammas)), ...
+    repmat(gammas(:), 2, 1), reshape(a.', [], 1), reshape(b.', [], 1), ...
+    reshape(sse.', [], 1), 'VariableNames', {'Year','Gamma','a','b','SSE'});
+
+fprintf('\nLocal calibration summary:\n');
+disp(calibTableCS);
+
+%%
+g0Idx = find(abs(gammas - 0) < 1e-12, 1);
+
+hw_CS_2022.a = a(1, g0Idx);
+hw_CS_2022.sigma = b(1, g0Idx);
+
+hw_CS_2023.a = a(2, g0Idx);
+hw_CS_2023.sigma = b(2, g0Idx);
 
 %% TASK 6: CVA with tree
 fprintf('\n\n========= Task 6: Amortizing Swap Pricing with CVA with numerical technique =========\n')
@@ -168,14 +169,14 @@ frequencies = {'quarterly', 'semiannual'};
 % 2022
 % ==========================================
 fprintf('\n--- REFERENCE DATE: 2022 ---\n');
-fprintf('Parametri HW (Physical Delivery, gamma=0) estratti dal Task 5 (2022): a = %.8f, sigma (b) = %.8f\n\n', hw_PD_2022.a, hw_PD_2022.sigma);
+fprintf('Parametri HW (CS, gamma=0) estratti dal Task 5 (2022): a = %.8f, sigma (b) = %.8f\n\n', hw_CS_2022.a, hw_CS_2022.sigma);
 
 for i = 1:length(frequencies)
     freq = frequencies{i};
     for j = 1:length(cdsSpreads)
         cds = cdsSpreads(j);
         
-        [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw_PD_2022,...
+        [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw_CS_2022,...
              swapData, OIS_Boot, EUR3M_Boot, settlementDate, fixedRate, ...
              isPayer, freq, cds, LGD);
              
@@ -188,14 +189,14 @@ end
 % 2023
 % ==========================================
 fprintf('\n--- REFERENCE DATE: 2023 ---\n');
-fprintf('Parametri HW (Physical Delivery, gamma=0) estratti dal Task 5 (2023): a = %.8f, sigma (b) = %.8f\n\n', hw_PD_2023.a, hw_PD_2023.sigma);
+fprintf('Parametri HW (CS, gamma=0) estratti dal Task 5 (2023): a = %.8f, sigma (b) = %.8f\n\n', hw_CS_2023.a, hw_CS_2023.sigma);
 
 for i = 1:length(frequencies)
     freq = frequencies{i};
     for j = 1:length(cdsSpreads)
         cds = cdsSpreads(j);
         
-        [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw_PD_2023,...
+        [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw_CS_2023,...
              swapData, OIS_Boot_2, EUR3M_Boot_2, settlementDate_2, fixedRate, ...
              isPayer, freq, cds, LGD, knownFixing_2023);
              
@@ -203,3 +204,5 @@ for i = 1:length(frequencies)
             freq, round(cds*10000), NPV_riskfree, CVA, final_price);
     end
 end
+
+toc

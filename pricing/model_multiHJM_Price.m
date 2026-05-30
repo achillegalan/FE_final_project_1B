@@ -1,15 +1,15 @@
 function [price, details] = model_multiHJM_Price( ...
     OIS_curve, EUR3M_curve, floatingPaymentDates, fixedPaymentDates, ...
-    strike, expiryYears, a, b, gamma, isPayer, isPD)
+    strike, expiryYears, a, b, gamma, isPayer, isCS)
 %MODEL_MULTIHJM_PRICE
-% Pricing di una swaption PD nel modello MHW di Baviera (2019), eq. (3.9)-(3.11).
+% Pricing di una swaption PD/CS nel modello MHW di Baviera (2019), eq. (3.9)-(3.11).
 % Nota: il parametro "b" qui corrisponde a "sigma" del paper.
 
     if nargin < 10 || isempty(isPayer)
         isPayer = true;
     end
-    if nargin < 11 || isempty(isPD)
-        isPD = true;
+    if nargin < 11 || isempty(isCS)
+        isCS = true;
     end
 
     settleDate = OIS_curve.settlementDate;
@@ -88,7 +88,7 @@ function [price, details] = model_multiHJM_Price( ...
     xStar = solveRootRobust(f);
 
     %% Closed-form PD receiver price (eq. 3.11)
-    if isPD
+    if ~isCS
         Ncdf = @(z) 0.5 * erfc(-z / sqrt(2));
         receiverPrice = P0T_alpha * ( ...
             sum(c .* Balpha_pay .* Ncdf(xStar + varsigma)) + ...
@@ -164,8 +164,6 @@ function [price, details] = model_multiHJM_Price( ...
     details.exerciseDate = exerciseDate;
     details.xStar = xStar;
     details.Price = price;
-    %details.BPV0 = BPV0;
-    %details.num0 = num0;
 
 
 % ------------------------ Inside Functions -------------------------------
