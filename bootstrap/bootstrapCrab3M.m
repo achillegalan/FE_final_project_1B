@@ -64,13 +64,6 @@ function curve = bootstrapCrab3M(mkt, oisCurve, settlementDate, flag)
     futStart = futStart(ord);
     futEnd = futEnd(ord);
 
-    % Use only futures with start date <= 2Y from settlement
-    cutoff2Y = add_target_months(settlementDate, 24, 'modifiedfollow');
-    keep = futStart <= cutoff2Y;
-    futIdx = futIdx(keep);
-    futStart = futStart(keep);
-    futEnd = futEnd(keep);
-
     futDelta = yearfrac(futStart, futEnd, 2); % ACT/360
     allCalcDates = [allCalcDates; futStart; futEnd];
 
