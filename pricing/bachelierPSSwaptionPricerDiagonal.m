@@ -1,8 +1,28 @@
 function [price, details] = bachelierPSSwaptionPricerDiagonal( ...
     OIS_curve, EUR3M_curve, floatingPaymentDates, fixedPaymentDates, ...
     strike, normalVol, TTM, Notional, isPayer, fixingFrequency, isCS)
-%BACHELIERPSSWAPTIONPRICERDIAGONAL Prices a physical-settlement swaption with Bachelier formula.
+%BACHELIERPSSWAPTIONPRICERDIAGONAL Prices a European swaption using the
+% market-standard Bachelier (normal) framework in a multi-curve setting.
 %
+% INPUT
+%   OIS_curve             Struct containing the OIS curve used for discounting.
+%   EUR3M_curve           Struct containing the Euribor 3M pseudo-discount curve.
+%   floatingPaymentDates  Vector of floating-leg payment dates.
+%   fixedPaymentDates     Vector of fixed-leg payment dates.
+%   strike                Swaption strike, i.e. the fixed rate of the underlying swap.
+%   normalVol             Market normal (Bachelier) volatility.
+%   TTM                   Time to maturity of the swaption, expressed in years.
+%   Notional              Scalar notional or amortizing notional vector.
+%   isPayer               Boolean flag: true for payer swaption, false for receiver.
+%   fixingFrequency       Floating reset frequency: "quarterly" or "semiannual".
+%   isCS                  Boolean flag: true for cash-settled, false for physical-delivery.
+%
+% OUTPUT
+%   price                 Swaption price obtained from the Bachelier formula.
+%   details               Struct containing intermediate pricing quantities,
+%                         including forward swap rate, annuity, discount factor,
+%                         standard deviation, accrual fractions and payment schedules.
+
     if nargin < 9 || isempty(isPayer)
         isPayer = true;
     end

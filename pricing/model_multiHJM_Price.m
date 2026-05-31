@@ -1,9 +1,29 @@
 function [price, details] = model_multiHJM_Price( ...
     OIS_curve, EUR3M_curve, floatingPaymentDates, fixedPaymentDates, ...
     strike, expiryYears, a, b, gamma, isPayer, isCS)
-%MODEL_MULTIHJM_PRICE
-% Pricing di una swaption PD/CS nel modello MHW di Baviera (2019), eq. (3.9)-(3.11).
-% Nota: il parametro "b" qui corrisponde a "sigma" del paper.
+%MODEL_MULTIHJM_PRICE Prices a European swaption in the multi-curve MHW model.
+%
+% This function prices a payer or receiver swaption under the parsimonious
+% multi-curve Heath-Jarrow-Morton model proposed by Baviera (2019).
+% It supports both physical-delivery and cash-settled swaptions.
+%
+% INPUT
+%   OIS_curve             Struct containing the OIS curve used for discounting.
+%   EUR3M_curve           Struct containing the Euribor 3M pseudo-discount curve.
+%   floatingPaymentDates  Vector of floating-leg payment dates.
+%   fixedPaymentDates     Vector of fixed-leg payment dates.
+%   strike                Swaption strike, i.e. the fixed rate of the underlying swap.
+%   expiryYears           Swaption expiry expressed in years.
+%   a                     Mean-reversion parameter of the multi-curve MHW model.
+%   b                     Volatility parameter of the multi-curve MHW model.
+%   gamma                 Multi-curve parameter of the Baviera (2019) model.
+%   isPayer               Boolean flag: true for payer swaption, false for receiver.
+%   isCS                  Boolean flag: true for cash-settled, false for physical-delivery.
+%
+% OUTPUT
+%   price                 Swaption price under the multi-curve MHW model.
+%   details               Struct containing pricing diagnostics and intermediate results,
+%                         including exerciseDate, xStar, and Price.
 
     if nargin < 10 || isempty(isPayer)
         isPayer = true;
@@ -88,24 +108,7 @@ function [price, details] = model_multiHJM_Price( ...
     xStar = solveRootRobust(f);
 
     %% Closed-form PD receiver price (eq. 3.11)
-    if ~isCS
-        Ncdf = @(z) 0.5 * erfc(-z / sqrt(2));
-        receiverPrice = P0T_alpha * ( ...
-            sum(c .* Balpha_pay .* Ncdf(xStar + varsigma)) + ...
-            sum(Balpha_start(2:end) .* Ncdf(xStar + varsigma(1:end-1))) - ...
-            sum(beta .* Balpha_start .* Ncdf(xStar + nu)) );
-    
-        % Put-call parity in PD case
-        BPV0 = sum(fixedDelta .* Balpha_pay(fixedIdxOnFloat));
-        num0 = 1 - Balpha_pay(end) + sum(Balpha_start .* (beta - 1));
-    
-        if isPayer
-            price = receiverPrice + P0T_alpha * (num0 - strike * BPV0);
-        else
-            price = receiverPrice;
-        end
-
-    else
+    if isCS
         Snum_coeff_beta = beta .* Balpha_start;      
         Snum_coeff_B = Balpha_pay;                
         Sbpv_delta = fixedDelta;                
@@ -156,6 +159,23 @@ function [price, details] = model_multiHJM_Price( ...
             integrandRec(~isfinite(integrandRec)) = 0;
      
             price = P0T_alpha * trapz(xGridRec, integrandRec);
+        end
+
+    else
+        Ncdf = @(z) 0.5 * erfc(-z / sqrt(2));
+        receiverPrice = P0T_alpha * ( ...
+            sum(c .* Balpha_pay .* Ncdf(xStar + varsigma)) + ...
+            sum(Balpha_start(2:end) .* Ncdf(xStar + varsigma(1:end-1))) - ...
+            sum(beta .* Balpha_start .* Ncdf(xStar + nu)) );
+    
+        % Put-call parity in PD case
+        BPV0 = sum(fixedDelta .* Balpha_pay(fixedIdxOnFloat));
+        num0 = 1 - Balpha_pay(end) + sum(Balpha_start .* (beta - 1));
+    
+        if isPayer
+            price = receiverPrice + P0T_alpha * (num0 - strike * BPV0);
+        else
+            price = receiverPrice;
         end
     end
      

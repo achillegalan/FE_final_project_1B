@@ -13,7 +13,7 @@ function diagData = buildDiagonalSwaptionMarketData( ...
 %   diagSwaptionsTable         table with columns: Expiry, Tenor, NormalVol_bps
 %   isPayer                    true/false (default true)
 %   isCS                       true = Cash-Settled convention,
-%                              false = Physical Delivery convention (default false)
+%                              false = Physical Delivery convention (default true for Task 5)
 %
 % OUTPUT:
 %   diagData.summary           compact table with calibration inputs
@@ -22,7 +22,7 @@ function diagData = buildDiagonalSwaptionMarketData( ...
         isPayer = true;
     end
     if nargin < 5 || isempty(isCS)
-        isCS = false;
+        isCS = true;
     end
 
     % Preallocation

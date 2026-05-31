@@ -1,12 +1,36 @@
 function [CVA, survProbs, CVA_det, CVA_stoch] = computeCVA_mix( ...
      swapData, OIS_curve, EUR3M_curve, settlementDate, strike, normalVol, ...
      isPayer, fixingFrequency, cdsSpreads, LGD, knownFixing, Mode)
-% COMPUTECVA Unified CVA engine:
-% - Mode = "bootstrap"        -> bootstrap survival probabilities
-% - Mode = "constant_lambda"  -> flat hazard rate lambda = cdsSpreads(1)/LGD
+% COMPUTECVA_MIX Computes the CVA of an amortizing interest rate swap.
 %
-% Backward compatible:
-% - If hazardMode is omitted, defaults to "bootstrap".
+% The function evaluates the CVA by combining two types of exposure:
+% deterministic exposure from coupons whose fixing is already known at the
+% valuation date, and stochastic exposure from future coupons approximated
+% through Bachelier swaption prices. Survival probabilities can be obtained
+% either by bootstrapping the CDS curve or by assuming a constant hazard rate.
+%
+% INPUT
+%   swapData          Table/struct containing the amortizing swap schedule:
+%                     PayDate, AccrualStart, AccrualEnd, Notional.
+%   OIS_curve         Struct containing the OIS discount curve.
+%   EUR3M_curve       Struct containing the Euribor 3M pseudo-discount curve.
+%   settlementDate    Valuation date.
+%   strike            Fixed rate of the swap.
+%   normalVol         Normal Bachelier volatility used for swaption pricing.
+%   isPayer           true for payer exposure, false for receiver exposure.
+%   fixingFrequency   Floating reset frequency: "quarterly" or "semiannual".
+%   cdsSpreads        CDS spreads used to derive survival probabilities.
+%   LGD               Loss Given Default.
+%   knownFixing       Optional struct with already observed fixings:
+%                     fields fixingDate and resetRate.
+%   Mode              Survival-probability method:
+%                     "bootstrap" or "constant_lambda".
+%
+% OUTPUT
+%   CVA               Total CVA value.
+%   survProbs         Survival probabilities at future payment dates.
+%   CVA_det           CVA contribution from already-fixed deterministic coupons.
+%   CVA_stoch         CVA contribution from still-stochastic future coupons.
 
 if nargin < 11
     knownFixing = [];

@@ -115,19 +115,19 @@ diagMkt2022 = buildDiagonalSwaptionMarketData(OIS_Boot,   EUR3M_Boot,   diagSwap
 diagMkt2023 = buildDiagonalSwaptionMarketData(OIS_Boot_2, EUR3M_Boot_2, diagSwaptions2023, isPayer, isCS);
 diagMkt = {diagMkt2022, diagMkt2023};
 
-        % %% 1. OBJECTIVE LANDSCAPE PLOT (only gamma = 0, year = 2022)
-        % aVec = linspace(0, 10, 50);
-        % bVec = linspace(0, 10, 50);
-        % 
-        % [~, ~, ~, minPoint] = plotMHWabObjectiveLandscape( ...
-        %     OISBoots{1}, EURBoots{1}, diagMkt{1}, 0, isPayer, aVec, bVec, isCS);
-        % 
-        % % 2. HYBRID CALIBRATION (only gamma = 0, year = 2022)
-        % [aHybrid22, bHybrid22, calHybrid22] = calibrateMHWabDiagonalHybrid( ...
-        %     OISBoots{1}, EURBoots{1}, diagMkt{1}, 0, isPayer, isCS);
-        % 
-        % fprintf('[Hybrid - 2022, gamma=0, CS] a=%.8f, b=%.8f, SSE=%.6e, RMSE=%.6e\n', ...
-        %     aHybrid22, bHybrid22, calHybrid22.sse, calHybrid22.rmse);
+        %% 1. OBJECTIVE LANDSCAPE PLOT (only gamma = 0, year = 2022)
+        aVec = linspace(0, 10, 50);
+        bVec = linspace(0, 10, 50);
+
+        [~, ~, ~, minPoint] = plotMHWabObjectiveLandscape( ...
+            OISBoots{1}, EURBoots{1}, diagMkt{1}, 0, isPayer, aVec, bVec, isCS);
+
+        % 2. HYBRID CALIBRATION (only gamma = 0, year = 2022)
+        [aHybrid22, bHybrid22, calHybrid22] = calibrateMHWabDiagonalHybrid( ...
+            OISBoots{1}, EURBoots{1}, diagMkt{1}, 0, isPayer, isCS);
+
+        fprintf('[Hybrid - 2022, gamma=0, CS] a=%.8f, b=%.8f, SSE=%.6e, RMSE=%.6e\n', ...
+            aHybrid22, bHybrid22, calHybrid22.sse, calHybrid22.rmse);
 
 %% 3. LOCAL CALIBRATION (all 6 cases: 3 gammas x 2 years, CS only)
 a = zeros(2, numel(gammas));
@@ -164,44 +164,37 @@ hw_CS_2023.sigma = b(2, g0Idx);
 fprintf('\n\n========= Task 6: Amortizing Swap Pricing with CVA with numerical technique =========\n')
 
 frequencies = {'quarterly', 'semiannual'};
+settlementDates = [settlementDate, settlementDate_2];
+hwCS = {hw_CS_2022, hw_CS_2023};
+knownFixingsTask6 = {[], knownFixing_2023};  % 2022 no historical fixing override, 2023 with known fixing
 
-% ==========================================
-% 2022
-% ==========================================
-fprintf('\n--- REFERENCE DATE: 2022 ---\n');
-fprintf('Parametri HW (CS, gamma=0) estratti dal Task 5 (2022): a = %.8f, sigma (b) = %.8f\n\n', hw_CS_2022.a, hw_CS_2022.sigma);
+for y = 1:numel(yearLabels)
+    yearLabel = yearLabels(y);
+    hw = hwCS{y};
+    knownFixingOpt = knownFixingsTask6{y};
 
-for i = 1:length(frequencies)
-    freq = frequencies{i};
-    for j = 1:length(cdsSpreads)
-        cds = cdsSpreads(j);
-        
-        [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw_CS_2022,...
-             swapData, OIS_Boot, EUR3M_Boot, settlementDate, fixedRate, ...
-             isPayer, freq, cds, LGD);
-             
-        fprintf("Freq: %-10s | CDS: %3d bps | NPV_riskfree: %10.2f EUR | CVA: %10.2f EUR | Final NPV: %10.2f EUR\n", ...
-            freq, round(cds*10000), NPV_riskfree, CVA, final_price);
-    end
-end
+    fprintf('\n--- REFERENCE DATE: %s ---\n', yearLabel);
+    fprintf('Parametri HW (CS, gamma=0) estratti dal Task 5 (%s): a = %.8f, sigma (b) = %.8f\n\n', ...
+        yearLabel, hw.a, hw.sigma);
 
-% ==========================================
-% 2023
-% ==========================================
-fprintf('\n--- REFERENCE DATE: 2023 ---\n');
-fprintf('Parametri HW (CS, gamma=0) estratti dal Task 5 (2023): a = %.8f, sigma (b) = %.8f\n\n', hw_CS_2023.a, hw_CS_2023.sigma);
+    for i = 1:numel(frequencies)
+        freq = frequencies{i};
+        for j = 1:numel(cdsSpreads)
+            cds = cdsSpreads(j);
 
-for i = 1:length(frequencies)
-    freq = frequencies{i};
-    for j = 1:length(cdsSpreads)
-        cds = cdsSpreads(j);
-        
-        [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw_CS_2023,...
-             swapData, OIS_Boot_2, EUR3M_Boot_2, settlementDate_2, fixedRate, ...
-             isPayer, freq, cds, LGD, knownFixing_2023);
-             
-        fprintf("Freq: %-10s | CDS: %3d bps | NPV_riskfree: %10.2f EUR | CVA: %10.2f EUR | Final NPV: %10.2f EUR\n", ...
-            freq, round(cds*10000), NPV_riskfree, CVA, final_price);
+            if isempty(knownFixingOpt)
+                [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw, ...
+                    swapData, OISBoots{y}, EURBoots{y}, settlementDates(y), fixedRate, ...
+                    isPayer, freq, cds, LGD);
+            else
+                [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw, ...
+                    swapData, OISBoots{y}, EURBoots{y}, settlementDates(y), fixedRate, ...
+                    isPayer, freq, cds, LGD, knownFixingOpt);
+            end
+
+            fprintf("Freq: %-10s | CDS: %3d bps | NPV_riskfree: %10.2f EUR | CVA: %10.2f EUR | Final NPV: %10.2f EUR\n", ...
+                freq, round(cds*10000), NPV_riskfree, CVA, final_price);
+        end
     end
 end
 
