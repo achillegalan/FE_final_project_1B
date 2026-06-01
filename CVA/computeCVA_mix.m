@@ -230,13 +230,8 @@ for i = 1:(numPeriods - 1)
     EPE_total(i) = optionDiscount * BPV_total * unitPrice * remNotional(1);
 end
 
-%% 4) Deterministic/Stochastic split
-% Because EPE[max(V)] cannot be split linearly without artificially
-% inflating the risk exposure, the entire calculation is handled together.
-EPE_det   = zeros(max(numPeriods - 1, 0), 1);
-EPE_stoch = EPE_total;
 
-%% 5) Final CVA
+%% 4) Final CVA
 probWeights = CVAsurvProbs(1:end-1);
 CVA       = LGD * sum(probWeights .* EPE_total);
 CVA_det   = 0;
