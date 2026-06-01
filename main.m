@@ -115,21 +115,19 @@ diagMkt2022 = buildDiagonalSwaptionMarketData(OIS_Boot,   EUR3M_Boot,   diagSwap
 diagMkt2023 = buildDiagonalSwaptionMarketData(OIS_Boot_2, EUR3M_Boot_2, diagSwaptions2023, isPayer, isCS);
 diagMkt = {diagMkt2022, diagMkt2023};
 
-        %% 1. OBJECTIVE LANDSCAPE PLOT (only gamma = 0, year = 2022)
-        aVec = linspace(0.0001, 0.15, 30);
-        bVec = linspace(0.0020, 0.0200, 30);
+        % %% 1. OBJECTIVE LANDSCAPE PLOT (only gamma = 0, year = 2022)
+        % aVec = linspace(0.0001, 0.15, 30);
+        % bVec = linspace(0.0020, 0.0200, 30);
+        %
+        % [~, ~, ~, minPoint] = plotMHWabObjectiveLandscape( ...
+        %    OISBoots{1}, EURBoots{1}, diagMkt{1}, 0, isPayer, aVec, bVec, isCS);
+        %
+        % %% 2. HYBRID CALIBRATION (all 6 cases: 3 gammas x 2 years)
+        % years = [2022, 2023];
+        % [hybridTableCS, hybridResCS] = runCalibrationHybrid( ...
+        %     years, gammas, OISBoots, EURBoots, diagMkt, isPayer, isCS);
 
-        [~, ~, ~, minPoint] = plotMHWabObjectiveLandscape( ...
-           OISBoots{1}, EURBoots{1}, diagMkt{1}, 0, isPayer, aVec, bVec, isCS);
-
-         %2. HYBRID CALIBRATION (only gamma = 0, year = 2022)
-        [aHybrid22, bHybrid22, calHybrid22] = calibrateMHWabDiagonalHybrid( ...
-            OISBoots{1}, EURBoots{1}, diagMkt{1}, 0, isPayer, isCS);
-
-        fprintf('[Hybrid - 2022, gamma=0, CS] a=%.8f, b=%.8f, SSE=%.6e, RMSE=%.6e\n', ...
-           aHybrid22, bHybrid22, calHybrid22.sse, calHybrid22.rmse);
-
-%% 3. LOCAL CALIBRATION (all 6 cases: 3 gammas x 2 years, CS only)
+%% 3. LOCAL CALIBRATION (all 6 cases: 3 gammas x 2 years)
 a = zeros(2, numel(gammas));
 b = zeros(2, numel(gammas));
 sse = zeros(2, numel(gammas));
