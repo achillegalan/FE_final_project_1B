@@ -3,8 +3,7 @@ function diagData = buildDiagonalSwaptionMarketData( ...
     
 %BUILDDIAGONALSWAPTIONMARKETDATA
 % Build market dataset on diagonal swaptions:
-% (1y15y, 3y12y, 5y10y, 8y7y, 10y5y, 12y3y, 15y1y).
-% Convenzione usata per Task 5:
+% Convenzione usata
 %   - floating leg: quarterly (fissa)
 %   - fixed leg: annual
 %
@@ -38,10 +37,10 @@ function diagData = buildDiagonalSwaptionMarketData( ...
     expiryDates = arrayfun(@(y) add_target_months(settlementDate, round(12 * y), 'modifiedfollow'), expiryYears);
     maturityDates = arrayfun(@(e,t) add_target_months(e, round(12 * t), 'modifiedfollow'), expiryDates, tenorYears);
 
-    strikeATM     = zeros(n,1);
-    annuityFwd    = zeros(n,1);
-    dfExpiry      = zeros(n,1);
-    marketPrice   = zeros(n,1);
+    strikeATM = zeros(n,1);
+    annuityFwd = zeros(n,1);
+    dfExpiry = zeros(n,1);
+    marketPrice = zeros(n,1);
 
     % Loop only where full vectorization is not practical:
     % each swaption has its own coupon schedule length.

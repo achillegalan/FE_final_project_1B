@@ -71,7 +71,7 @@ switch Mode
     case "bootstrap"
         survProbs = bootstrapSurvivalProbabilities(OIS_curve, futurePayDates, cdsSpreads, LGD);
 
-    case {"constantlambda","constant_lambda","flatlambda","flat_lambda"}
+    case {"constant_lambda"}
         if LGD <= 0
             error('LGD must be > 0 for constant lambda mode.');
         end
@@ -154,11 +154,10 @@ end
 
 %% 3) Stochastic exposures via swaptions
 swaptionPrices = zeros(max(numPeriods - 1, 0), 1);
-for i = 1:(numPeriods - 1)
-    if isFixedAtValuation(i)
-        continue;
-    end
 
+for i = 1:(numPeriods - 1)
+    % keep swaption term for every default bucket i=1,...,b-1
+    % (Brigo formula 5.5 style), even if first coupon is already fixed.
     exerciseDate = futurePayDates(i);
     swaptionPrices(i) = bachelierPSSwaptionPricerCVA( ...
         OIS_curve, EUR3M_curve, futurePayDates, strike, normalVol, ...
@@ -166,16 +165,18 @@ for i = 1:(numPeriods - 1)
 end
 
 %% 4) Deterministic/Stochastic split
-EPE_det   = zeros(max(numPeriods - 1, 0), 1);
-EPE_stoch = zeros(max(numPeriods - 1, 0), 1);
+EPE_det = zeros(max(numPeriods - 1, 0), 1);
 
 if numPeriods >= 2
     bucketFixedMask = isFixedAtValuation(1:end-1);
     detBuckets = detCF_PV(1:end-1);
 
+    % Deterministic part only for already-fixed first coupon in the bucket
     EPE_det(bucketFixedMask) = max(0, detBuckets(bucketFixedMask));
-    EPE_stoch(~bucketFixedMask) = swaptionPrices(~bucketFixedMask);
 end
+
+% Stochastic swaption part for ALL buckets
+EPE_stoch = swaptionPrices;
 
 EPE_total = EPE_det + EPE_stoch;
 probWeights = CVAsurvProbs(1:end-1);
