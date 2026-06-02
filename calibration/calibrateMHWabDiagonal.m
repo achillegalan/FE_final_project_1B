@@ -27,9 +27,10 @@ function [aCal, bCal, calib] = calibrateMHWabDiagonal( ...
         isCS = true;
     end
 
-    % Initial guess
-    x0 = [0.01, 0.01];
-    
+    % Initial guesses: multi-start calibration
+    x0List = [  0.1, 0.1;
+                0.08, 0.015 ];
+        
     mkt = diagData.summary;
     expiryYears = mkt.ExpiryYears(:);
     tenorYears = mkt.TenorYears(:);
@@ -53,15 +54,38 @@ function [aCal, bCal, calib] = calibrateMHWabDiagonal( ...
     end
 
     % Constrained optimization: enforce a,b > 0 with lower bounds.
-    lb = [0, 0];
-    ub = [];
+    lb = [0, eps];
+    ub = [0.4, 0.4];
     
     opts = optimoptions('fmincon','Display','off','Algorithm','sqp', ...
-        'StepTolerance',1e-9,'FunctionTolerance',1e-12, ...
-        'MaxIterations',3000,'MaxFunctionEvaluations',10000);
+        'StepTolerance',1e-9,'FunctionTolerance',1e-15, ...
+        'MaxIterations',2500,'MaxFunctionEvaluations',10000);
 
-    [xOpt, sseMin] = fmincon(@objectiveAB, x0, [], [], [], [], lb, ub, [], opts);
+    nStarts = size(x0List, 1);
+    xOptAll = zeros(nStarts, 2);
+    sseAll = inf(nStarts, 1);
+    exitflagAll = zeros(nStarts, 1);
     
+    for k = 1:nStarts
+        x0 = x0List(k, :);
+    
+        try
+            [xOptAll(k, :), sseAll(k), exitflagAll(k)] = fmincon( ...
+                @objectiveAB, x0, [], [], [], [], lb, ub, [], opts);
+        catch
+            sseAll(k) = inf;
+            exitflagAll(k) = NaN;
+        end
+    end
+    
+    [sseMin, bestIdx] = min(sseAll);
+    
+    if ~isfinite(sseMin)
+        error('calibrateMHWabDiagonal:MultiStartFailure', ...
+              'All fmincon multi-start calibrations failed.');
+    end
+    
+    xOpt = xOptAll(bestIdx, :);
     aCal = xOpt(1);
     bCal = xOpt(2);
 

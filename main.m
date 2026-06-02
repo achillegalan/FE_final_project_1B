@@ -131,6 +131,7 @@ diagMkt = {diagMkt2022, diagMkt2023};
 a = zeros(2, numel(gammas));
 b = zeros(2, numel(gammas));
 sse = zeros(2, numel(gammas));
+rmse = zeros(2, numel(gammas));   
 
 for y = 1:numel(OISBoots)
     [aC, bC, calC] = arrayfun(@(g) calibrateMHWabDiagonal( ...
@@ -140,11 +141,13 @@ for y = 1:numel(OISBoots)
     a(y,:) = cell2mat(aC);
     b(y,:) = cell2mat(bC);
     sse(y,:) = cellfun(@(c) c.sse, calC);
+    rmse(y,:) = cellfun(@(c) c.rmse, calC);  
 end
 
 calibTableCS = table( repelem([2022; 2023], numel(gammas)), ...
     repmat(gammas(:), 2, 1), reshape(a.', [], 1), reshape(b.', [], 1), ...
-    reshape(sse.', [], 1), 'VariableNames', {'Year','Gamma','a','b','SSE'});
+    reshape(sse.', [], 1), reshape(rmse.', [], 1), ...
+    'VariableNames', {'Year','Gamma','a','b','SSE','RMSE'});
 
 fprintf('\nLocal calibration summary:\n');
 disp(calibTableCS);
