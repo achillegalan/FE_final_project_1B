@@ -2,7 +2,8 @@ function [CVA_mat, CVA_det_mat, CVA_stoch_mat, NPV_mat] = runCVASection( ...
     swapData, OIS_Boot, EUR3M_Boot, settlementDate, strike, normalVol, ...
     isPayer, fixingFrequency, cdsSpreads, LGD, knownFixing, hazardModes, swapRiskFree)
 
-%RUNCVASECTION Runs CVA computations for multiple CDS spreads and hazard modes.
+%RUNCVASECTION Runs CVA computations for multiple CDS spreads and hazard modes 
+% and prints the results.
 %
 % INPUTS:
 %   swapData        - Table/struct with PayDate, AccrualStart, AccrualEnd, Notional.
@@ -37,7 +38,7 @@ CVA_stoch_mat = zeros(nCDS, nModes);
 NPV_mat       = zeros(nCDS, nModes);
 
 for m = 1:nModes
-    [CVA_cell, ~, CVA_det_cell, CVA_stoch_cell] = arrayfun(@(s) computeCVA_mix( ...
+    [CVA_cell, ~, CVA_det_cell, CVA_stoch_cell] = arrayfun(@(s) computeCVA( ...
         swapData, OIS_Boot, EUR3M_Boot, settlementDate, strike, normalVol, ...
         isPayer, fixingFrequency, s, LGD, knownFixing, hazardModes(m)), ...
         cdsSpreads, 'UniformOutput', false);
@@ -46,5 +47,22 @@ for m = 1:nModes
     CVA_det_mat(:, m)   = [CVA_det_cell{:}]';
     CVA_stoch_mat(:, m) = [CVA_stoch_cell{:}]';
     NPV_mat(:, m)       = swapRiskFree - CVA_mat(:, m);
+end
+
+
+%% Print of the table
+fprintf('\nQuarterly MtM (risk-free): %.2f EUR\n', swapRiskFree);
+
+for m = 1:nModes
+    fprintf('\n --- HAZARD-RATE METHOD: %s ---\n', hazardModes(m));
+    fprintf('%-10s | %-14s | %-14s | %-14s | %-18s\n', ...
+        'CDS (bps)', 'CVA [EUR]', 'CVA_det [EUR]', 'CVA_stoch [EUR]', 'Swap NPV with CVA');
+    fprintf('%s\n', repmat('-', 1, 84));
+
+    for k = 1:nCDS
+        fprintf('%-10d | %14.2f | %14.2f | %14.2f | %18.2f\n', ...
+            cdsSpreads(k)*1e4, CVA_mat(k,m), CVA_det_mat(k,m), ...
+            CVA_stoch_mat(k,m), NPV_mat(k,m));
+    end
 end
 end

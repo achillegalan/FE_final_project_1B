@@ -1,4 +1,4 @@
-function [CVA, survProbs, CVA_det, CVA_stoch] = computeCVA_mix( ...
+function [CVA, survProbs, CVA_det, CVA_stoch] = computeCVA( ...
      swapData, OIS_curve, EUR3M_curve, settlementDate, strike, normalVol, ...
      isPayer, fixingFrequency, cdsSpreads, LGD, knownFixing, Mode)
 % COMPUTECVA_MIX Computes the CVA of an amortizing interest rate swap.
@@ -21,7 +21,7 @@ function [CVA, survProbs, CVA_det, CVA_stoch] = computeCVA_mix( ...
 %   cdsSpreads        CDS spreads used to derive survival probabilities.
 %   LGD               Loss Given Default.
 %   knownFixing       Optional struct with already observed fixings.
-%   Mode              Survival-probability method: "bootstrap" or "constant_lambda".
+%   Mode              Survival-probability method: "BOOTSTRAP" or "CONSTANT LAMBDA".
 %
 % OUTPUT
 %   CVA               Total CVA value.
@@ -33,9 +33,9 @@ if nargin < 11
     knownFixing = [];
 end
 if nargin < 12 || isempty(Mode)
-    Mode = "bootstrap";
+    Mode = "BOOTSTRAP";
 end
-Mode = lower(string(strtrim(Mode)));
+Mode = upper(strrep(string(strtrim(Mode)), "_", " "));
 
 % Extract full schedules FIRST to avoid index offsets in semiannual mapping
 fullNumPeriods = length(swapData.PayDate);
@@ -86,20 +86,17 @@ end
 
 %% 1) Survival probabilities
 switch Mode
-    case "bootstrap"
+    case {"BOOTSTRAP", "BOOSTRAP"}
         survProbs = bootstrapSurvivalProbabilities(OIS_curve, futurePayDates, cdsSpreads, LGD);
-    case {"constant_lambda"}
+    case "CONSTANT LAMBDA"
         if LGD <= 0
             error('LGD must be > 0 for constant lambda mode.');
-        end
-        if isempty(cdsSpreads) || ~isfinite(cdsSpreads(1))
-            error('cdsSpreads(1) must be finite for constant lambda mode.');
         end
         constant_lambda = cdsSpreads(1) / LGD;
         yearsFromSettle = yearfrac(settlementDate, futurePayDates, 2); % ACT/360
         survProbs = exp(-constant_lambda * yearsFromSettle);
     otherwise
-        error('Unknown hazardMode "%s". Use "bootstrap" or "constant_lambda".', Mode);
+        error('Unknown hazardMode "%s". Use "BOOTSTRAP" or "CONSTANT LAMBDA".', Mode);
 end
 
 survProbs = survProbs(:);

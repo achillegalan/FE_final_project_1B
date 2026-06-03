@@ -4,7 +4,6 @@
 clc
 clear all
 tic
-rng(1234);
 ActiveFolders()
 
 %% LOADING DATASET
@@ -50,7 +49,7 @@ fprintf("Swap price from Bank perspective (MtM) [reset: semiannual] is: %.2f EUR
 %% TASK 3: Amortizing Swap Pricing with CVA: simplified approach
 fprintf('\n\n========= Task 3: CVA Computation 2022 =========\n')
 normalVol = loadSwaptionVols();
-strike = fixedRate;
+% we are ATM --> strike = fixedRate;
 % Bank receives Euribor 3M, pays 2.21%. 
 % The exposure to Corporate default happens when the swap value is positive to Bank. 
 % An option to enter a Pay-Fixed Swap is a Payer Swaption.
@@ -60,16 +59,12 @@ LGD = 0.40;
 
 cdsSpreads = [300 500]/1e4;
 
-hazardModes = ["bootstrap", "constant_lambda"];
-hazardNames = ["BOOTSTRAP", "CONSTANT LAMBDA"];
+hazardModes = ["BOOTSTRAP", "CONSTANT LAMBDA"];
 
 [CVA_2022, CVA_det_2022, CVA_stoch_2022, NPV_2022] = runCVASection( ...
-    swapData, OIS_Boot, EUR3M_Boot, settlementDate, strike, normalVol, ...
+    swapData, OIS_Boot, EUR3M_Boot, settlementDate, fixedRate, normalVol, ...
     isPayer, fixingFrequency, cdsSpreads, LGD, knownFixing_2022, ...
     hazardModes, swap_quarterly);
-
-printCVATable('2022', swap_quarterly, cdsSpreads, hazardNames, ...
-    CVA_2022, CVA_det_2022, CVA_stoch_2022, NPV_2022);
 
 %% TASK 4: CVA 2023
 fprintf('\n\n========= Task 4: CVA Computation 2023 =========\n')
@@ -88,13 +83,9 @@ normalVol_2 = loadSwaptionVolsUnwinding();
     isPayer, fixingFrequency, cdsSpreads, LGD, knownFixing_2023, ...
     hazardModes, swapUnwindPrice);
 
-printCVATable('2023', swapUnwindPrice, cdsSpreads, hazardNames, ...
-    CVA_2023, CVA_det_2023, CVA_stoch_2023, NPV_2023);
-
 %% TASK 5: MHW calibration (CS only)
 fprintf('\n\n========= Task 5: Calibration MHW =========\n');
 gammas = [0, 0.5, 1];
-isPayer = true;
 isCS = true;    % true  -> CS convention in market data builder
 
 diagExpiry = [1; 3; 5; 8; 10; 12; 15];
@@ -105,14 +96,13 @@ OISBoots   = {OIS_Boot, OIS_Boot_2};
 EURBoots   = {EUR3M_Boot, EUR3M_Boot_2};
 
 % Build diagonal quotes and market calibration data once per year.
-diagSwaptions2022 = buildDiagonalSwaptionTable(diagExpiry, diagTenor, "2022");
-diagSwaptions2023 = buildDiagonalSwaptionTable(diagExpiry, diagTenor, "2023");
-diagSwaptions = {diagSwaptions2022, diagSwaptions2023};
-
-diagMkt2022 = buildDiagonalSwaptionMarketData(OIS_Boot,   EUR3M_Boot,   diagSwaptions2022, isPayer, isCS);
-diagMkt2023 = buildDiagonalSwaptionMarketData(OIS_Boot_2, EUR3M_Boot_2, diagSwaptions2023, isPayer, isCS);
-diagMkt = {diagMkt2022, diagMkt2023};
-
+diagSwaptions = cell(1, numel(yearLabels));
+diagMkt = cell(1, numel(yearLabels));
+for y = 1:numel(yearLabels)
+    diagSwaptions{y} = buildDiagonalSwaptionTable(diagExpiry, diagTenor, yearLabels(y));
+    diagMkt{y} = buildDiagonalSwaptionMarketData( ...
+        OISBoots{y}, EURBoots{y}, diagSwaptions{y}, isPayer, isCS);
+end
         % %% 1. OBJECTIVE LANDSCAPE PLOT (only gamma = 0, year = 2022)
         % aVec = linspace(0.0001, 0.4, 30);
         % bVec = linspace(0.0020, 0.4, 30);
@@ -121,15 +111,13 @@ diagMkt = {diagMkt2022, diagMkt2023};
         %    OISBoots{1}, EURBoots{1}, diagMkt{1}, 0, isPayer, aVec, bVec, isCS);
         % 
         % % 2. HYBRID CALIBRATION (all 6 cases: 3 gammas x 2 years)
-        % years = [2022, 2023];
+        % rng(1234);
         % [hybridTableCS, hybridResCS] = runCalibrationHybrid( ...cl
-        %     years, gammas, OISBoots, EURBoots, diagMkt, isPayer, isCS);
+        %     yearLabels, gammas, OISBoots, EURBoots, diagMkt, isPayer, isCS);
 
 %% 3. LOCAL CALIBRATION (all 6 cases: 3 gammas x 2 years)
-a = zeros(2, numel(gammas));
-b = zeros(2, numel(gammas));
-sse = zeros(2, numel(gammas));
-rmse = zeros(2, numel(gammas));   
+a = zeros(2, numel(gammas));    b = zeros(2, numel(gammas));
+sse = zeros(2, numel(gammas));  rmse = zeros(2, numel(gammas));   
 
 for y = 1:numel(OISBoots)
     [aC, bC, calC] = arrayfun(@(g) calibrateMHWabDiagonal( ...
@@ -142,7 +130,7 @@ for y = 1:numel(OISBoots)
     rmse(y,:) = cellfun(@(c) c.rmse, calC);  
 end
 
-calibTableCS = table( repelem([2022; 2023], numel(gammas)), ...
+calibTableCS = table( repelem(yearLabels(:), numel(gammas)), ...
     repmat(gammas(:), 2, 1), reshape(a.', [], 1), reshape(b.', [], 1), ...
     reshape(sse.', [], 1), reshape(rmse.', [], 1), ...
     'VariableNames', {'Year','Gamma','a','b','SSE','RMSE'});

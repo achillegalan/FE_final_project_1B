@@ -3,10 +3,10 @@ function [hybridTable, out] = runCalibrationHybrid( ...
 %RUNCALIBRATIONHYBRID Run hybrid MHW calibration on multiple years/gammas.
 %
 % INPUT
-%   years                 Numeric vector (e.g. [2022, 2023]).
-%   gammas                Gamma vector (e.g. [0, 0.5, 1]).
-%   OISBoots, EURBoots    Cell arrays of bootstrapped curves (one per year).
-%   diagMkt               Cell array of diagonal market data (one per year).
+%   years                 Sting labels.
+%   gammas                Gamma vector.
+%   OISBoots, EURBoots    Cell arrays of bootstrapped curves.
+%   diagMkt               Cell array of diagonal market data.
 %   isPayer               true/false (default true).
 %   isCS                  true/false for CS convention (default true).
 %
@@ -23,11 +23,6 @@ function [hybridTable, out] = runCalibrationHybrid( ...
 
     nYears = numel(years);
     nGammas = numel(gammas);
-
-    if nYears ~= numel(OISBoots) || nYears ~= numel(EURBoots) || nYears ~= numel(diagMkt)
-        error('runCalibrationHybrid:InputSizeMismatch', ...
-            'years, OISBoots, EURBoots and diagMkt must have the same length.');
-    end
 
     aHybrid = zeros(nYears, nGammas);
     bHybrid = zeros(nYears, nGammas);
@@ -46,7 +41,7 @@ function [hybridTable, out] = runCalibrationHybrid( ...
             sseHybrid(iy, ig) = calHybrid{iy, ig}.sse;
             rmseHybrid(iy, ig) = calHybrid{iy, ig}.rmse;
 
-            fprintf('[Hybrid - %d, gamma=%.1f, CS] a=%.8f, b=%.8f, SSE=%.6e, RMSE=%.6e\n', ...
+            fprintf('[Hybrid - %s, gamma=%.1f, CS] a=%.8f, b=%.8f, SSE=%.6e, RMSE=%.6e\n', ...
                 years(iy), g, aHybrid(iy, ig), bHybrid(iy, ig), ...
                 sseHybrid(iy, ig), rmseHybrid(iy, ig));
         end
