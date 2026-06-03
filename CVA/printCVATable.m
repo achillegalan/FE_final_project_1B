@@ -22,7 +22,7 @@ nModes = numel(hazardNames);
 fprintf('\nQuarterly MtM (risk-free) %s: %.2f EUR\n', yearLabel, swapRiskFree);
 
 for m = 1:nModes
-    fprintf('\n--- %s ---\n', hazardNames(m));
+    fprintf('\n --- HAZARD-RATE METHOD: %s ---\n', hazardNames(m));
     fprintf('%-10s | %-14s | %-14s | %-14s | %-18s\n', ...
         'CDS (bps)', 'CVA [EUR]', 'CVA_det [EUR]', 'CVA_stoch [EUR]', 'Swap NPV with CVA');
     fprintf('%s\n', repmat('-', 1, 84));

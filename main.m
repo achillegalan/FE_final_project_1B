@@ -31,22 +31,20 @@ swapData = importExcellData('SwapAmortizingPlan_v1.xlsx', 'SwapPlan', ...
 % 2022 curves
 OIS_Boot = bootstrapOIS(settlementDate, OIS_Curve);
 EUR3M_Boot = bootstrapCrab3M(EUR3M_Curve, OIS_Boot, settlementDate, true);
-% disp(EUR3M_Boot.table)
 
 % 2023 curves
 OIS_Boot_2 = bootstrapOIS(settlementDate_2, OIS_Curve_2);
 EUR3M_Boot_2 = bootstrapCrab3M(EUR3M_Curve_2, OIS_Boot_2, settlementDate_2, true);
-%disp(EUR3M_Boot_2.table)
 
 %% TASK 2: NPV_riskfree Ammortized Swap
-fprintf('\n\n========= Task 2: NPV risk-free 2022 =========\n')
+fprintf('\n========= Task 2: NPV risk-free 2022 =========\n')
 knownFixing_2022 = struct('fixingDate', datetime(2022,06,24), 'resetRate', -0.00218);
 fixedRate = 0.0221;
 swap_quarterly = AmmortizedSwapPricer( ...
     swapData, OIS_Boot, EUR3M_Boot, settlementDate, fixedRate, 'quarterly', knownFixing_2022);
 swap_semiannual = AmmortizedSwapPricer( ...
     swapData, OIS_Boot, EUR3M_Boot, settlementDate, fixedRate, 'semiannual', knownFixing_2022);
-fprintf("Swap price from Bank perspective (MtM) [reset: quarterly] is: %.2f EUR\n", swap_quarterly);
+fprintf("Swap price from Bank perspective (MtM) [reset: quarterly] is:  %.2f EUR\n", swap_quarterly);
 fprintf("Swap price from Bank perspective (MtM) [reset: semiannual] is: %.2f EUR\n", swap_semiannual);
 
 %% TASK 3: Amortizing Swap Pricing with CVA: simplified approach
@@ -153,16 +151,22 @@ fprintf('\nLocal calibration summary:\n');
 disp(calibTableCS);
 
 %%
-g0Idx = find(abs(gammas - 0) < 1e-12, 1);
-
-hw_CS_2022.a = a(1, g0Idx);
-hw_CS_2022.sigma = b(1, g0Idx);
-
-hw_CS_2023.a = a(2, g0Idx);
-hw_CS_2023.sigma = b(2, g0Idx);
+% g0Idx = find(abs(gammas - 0) < 1e-12, 1);
+% 
+% hw_CS_2022.a = a(1, g0Idx);
+% hw_CS_2022.sigma = b(1, g0Idx);
+% 
+% hw_CS_2023.a = a(2, g0Idx);
+% hw_CS_2023.sigma = b(2, g0Idx);
 
 %% TASK 6: CVA with tree
 fprintf('\n\n========= Task 6: Amortizing Swap Pricing with CVA with numerical technique =========\n')
+
+% Estract the values of a and gamma from the previous point
+calibGamma0 = calibTableCS(calibTableCS.Gamma == 0, :);
+hw_CS_2022 = struct('a', calibGamma0.a(1), 'sigma', calibGamma0.b(1));
+hw_CS_2023 = struct('a', calibGamma0.a(2), 'sigma', calibGamma0.b(2));
+
 
 frequencies = {'quarterly', 'semiannual'};
 settlementDates = [settlementDate, settlementDate_2];
@@ -175,7 +179,7 @@ for y = 1:numel(yearLabels)
     knownFixingOpt = knownFixingsTask6{y};
 
     fprintf('\n--- REFERENCE DATE: %s ---\n', yearLabel);
-    fprintf('Parametri HW (CS, gamma=0) estratti dal Task 5 (%s): a = %.8f, sigma (b) = %.8f\n\n', ...
+    fprintf('Parameters HW (CS, gamma=0) from calibration (task 5) (%s): a = %.8f, sigma (b) = %.8f\n\n', ...
         yearLabel, hw.a, hw.sigma);
 
     for i = 1:numel(frequencies)
