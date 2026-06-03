@@ -61,9 +61,6 @@ function [hybridTable, out] = runCalibrationHybrid( ...
         reshape(rmseHybrid.', [], 1), ...
         'VariableNames', {'Year', 'Gamma', 'a', 'b', 'SSE', 'RMSE'});
 
-    fprintf('\nHybrid calibration summary:\n');
-    disp(hybridTable);
-
     out = struct();
     out.years = years;
     out.gammas = gammas;
@@ -73,67 +70,5 @@ function [hybridTable, out] = runCalibrationHybrid( ...
     out.rmse = rmseHybrid;
     out.calib = calHybrid;
 
-    plotHybridCalibrationSummary(out);
-
-end
-
-function plotHybridCalibrationSummary(res)
-    years = res.years;
-    gammas = res.gammas;
-
-    figure('Name', 'Hybrid calibration summary');
-    tl = tiledlayout(2, 2, 'Padding', 'compact', 'TileSpacing', 'compact');
-    title(tl, 'MHW Hybrid Calibration (CS)');
-
-    nexttile;
-    hold on;
-    for iy = 1:numel(years)
-        plot(gammas, res.a(iy, :), '-o', 'LineWidth', 1.4, ...
-            'DisplayName', sprintf('%d', years(iy)));
-    end
-    hold off;
-    xlabel('\gamma');
-    ylabel('a');
-    title('a vs \gamma');
-    grid on;
-    legend('Location', 'best');
-
-    nexttile;
-    hold on;
-    for iy = 1:numel(years)
-        plot(gammas, res.b(iy, :), '-o', 'LineWidth', 1.4, ...
-            'DisplayName', sprintf('%d', years(iy)));
-    end
-    hold off;
-    xlabel('\gamma');
-    ylabel('b');
-    title('b vs \gamma');
-    grid on;
-    legend('Location', 'best');
-
-    nexttile;
-    hold on;
-    for iy = 1:numel(years)
-        semilogy(gammas, max(res.sse(iy, :), eps), '-o', 'LineWidth', 1.4, ...
-            'DisplayName', sprintf('%d', years(iy)));
-    end
-    hold off;
-    xlabel('\gamma');
-    ylabel('SSE');
-    title('SSE vs \gamma');
-    grid on;
-    legend('Location', 'best');
-
-    nexttile;
-    hold on;
-    for iy = 1:numel(years)
-        semilogy(gammas, max(res.rmse(iy, :), eps), '-o', 'LineWidth', 1.4, ...
-            'DisplayName', sprintf('%d', years(iy)));
-    end
-    hold off;
-    xlabel('\gamma');
-    ylabel('RMSE');
-    title('RMSE vs \gamma');
-    grid on;
-    legend('Location', 'best');
+   
 end

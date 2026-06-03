@@ -114,15 +114,15 @@ diagMkt2023 = buildDiagonalSwaptionMarketData(OIS_Boot_2, EUR3M_Boot_2, diagSwap
 diagMkt = {diagMkt2022, diagMkt2023};
 
         % %% 1. OBJECTIVE LANDSCAPE PLOT (only gamma = 0, year = 2022)
-        % aVec = linspace(0.0001, 0.15, 30);
-        % bVec = linspace(0.0020, 0.0200, 30);
-        %
+        % aVec = linspace(0.0001, 0.4, 30);
+        % bVec = linspace(0.0020, 0.4, 30);
+        % 
         % [~, ~, ~, minPoint] = plotMHWabObjectiveLandscape( ...
         %    OISBoots{1}, EURBoots{1}, diagMkt{1}, 0, isPayer, aVec, bVec, isCS);
-        %
-        % %% 2. HYBRID CALIBRATION (all 6 cases: 3 gammas x 2 years)
+        % 
+        % % 2. HYBRID CALIBRATION (all 6 cases: 3 gammas x 2 years)
         % years = [2022, 2023];
-        % [hybridTableCS, hybridResCS] = runCalibrationHybrid( ...
+        % [hybridTableCS, hybridResCS] = runCalibrationHybrid( ...cl
         %     years, gammas, OISBoots, EURBoots, diagMkt, isPayer, isCS);
 
 %% 3. LOCAL CALIBRATION (all 6 cases: 3 gammas x 2 years)
@@ -157,11 +157,10 @@ fprintf('\n\n========= Task 6: Amortizing Swap Pricing with CVA with numerical t
 calibGamma0 = calibTableCS(calibTableCS.Gamma == 0, :);
 hw_CS_2022 = struct('a', calibGamma0.a(1), 'sigma', calibGamma0.b(1));
 hw_CS_2023 = struct('a', calibGamma0.a(2), 'sigma', calibGamma0.b(2));
-
+hwCS = {hw_CS_2022, hw_CS_2023};
 
 frequencies = {'quarterly', 'semiannual'};
 settlementDates = [settlementDate, settlementDate_2];
-hwCS = {hw_CS_2022, hw_CS_2023};
 knownFixingsTask6 = {[], knownFixing_2023};  % 2022 no historical fixing override, 2023 with known fixing
 
 for y = 1:numel(yearLabels)

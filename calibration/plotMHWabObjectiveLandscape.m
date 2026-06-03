@@ -65,10 +65,6 @@ function [Agrid, Bgrid, SSEgrid, minPoint] = plotMHWabObjectiveLandscape( ...
     end
 
     validMask = isfinite(SSEgrid);
-    if ~any(validMask(:))
-        error('plotMHWabObjectiveLandscape:NoValidGridPoint', ...
-            'All grid evaluations failed. Try a different (a,b) range.');
-    end
 
     sseForMin = SSEgrid;
     sseForMin(~validMask) = inf;
@@ -85,7 +81,7 @@ function [Agrid, Bgrid, SSEgrid, minPoint] = plotMHWabObjectiveLandscape( ...
     nexttile;
     contourf(Agrid, Bgrid, plotSSE, 24, 'LineStyle', 'none');
     hold on;
-    plot(aMin, bMin, 'kp', 'MarkerFaceColor', 'y', 'MarkerSize', 11);
+    %plot(aMin, bMin, 'kp', 'MarkerFaceColor', 'y', 'MarkerSize', 11);
     hold off;
     xlabel('a');
     ylabel('b');
@@ -99,7 +95,7 @@ function [Agrid, Bgrid, SSEgrid, minPoint] = plotMHWabObjectiveLandscape( ...
     nexttile;
     surf(Agrid, Bgrid, plotSSE, 'EdgeColor', 'none');
     hold on;
-    plot3(aMin, bMin, zMin, 'kp', 'MarkerFaceColor', 'y', 'MarkerSize', 11);
+    %plot3(aMin, bMin, zMin, 'kp', 'MarkerFaceColor', 'y', 'MarkerSize', 11);
     hold off;
     xlabel('a');
     ylabel('b');
