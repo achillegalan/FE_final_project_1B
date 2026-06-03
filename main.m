@@ -150,15 +150,6 @@ calibTableCS = table( repelem([2022; 2023], numel(gammas)), ...
 fprintf('\nLocal calibration summary:\n');
 disp(calibTableCS);
 
-%%
-% g0Idx = find(abs(gammas - 0) < 1e-12, 1);
-% 
-% hw_CS_2022.a = a(1, g0Idx);
-% hw_CS_2022.sigma = b(1, g0Idx);
-% 
-% hw_CS_2023.a = a(2, g0Idx);
-% hw_CS_2023.sigma = b(2, g0Idx);
-
 %% TASK 6: CVA with tree
 fprintf('\n\n========= Task 6: Amortizing Swap Pricing with CVA with numerical technique =========\n')
 
