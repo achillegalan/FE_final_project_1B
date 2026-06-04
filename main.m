@@ -124,8 +124,7 @@ for y = 1:numel(OISBoots)
         OISBoots{y}, EURBoots{y}, diagMkt{y}, g, isPayer, isCS), ...
         gammas, 'UniformOutput', false);
 
-    a(y,:) = cell2mat(aC);
-    b(y,:) = cell2mat(bC);
+    a(y,:) = cell2mat(aC);    b(y,:) = cell2mat(bC);
     sse(y,:) = cellfun(@(c) c.sse, calC);
     rmse(y,:) = cellfun(@(c) c.rmse, calC);  
 end
@@ -140,16 +139,14 @@ disp(calibTableCS);
 
 %% TASK 6: CVA with tree
 fprintf('\n\n========= Task 6: Amortizing Swap Pricing with CVA with numerical technique =========\n')
-
 % Estract the values of a and gamma from the previous point
 calibGamma0 = calibTableCS(calibTableCS.Gamma == 0, :);
 hw_CS_2022 = struct('a', calibGamma0.a(1), 'sigma', calibGamma0.b(1));
 hw_CS_2023 = struct('a', calibGamma0.a(2), 'sigma', calibGamma0.b(2));
 hwCS = {hw_CS_2022, hw_CS_2023};
 
-frequencies = {'quarterly', 'semiannual'};
 settlementDates = [settlementDate, settlementDate_2];
-knownFixingsTask6 = {[], knownFixing_2023};  % 2022 no historical fixing override, 2023 with known fixing
+knownFixingsTask6 = {knownFixing_2022, knownFixing_2023}; 
 
 for y = 1:numel(yearLabels)
     yearLabel = yearLabels(y);
@@ -160,24 +157,14 @@ for y = 1:numel(yearLabels)
     fprintf('Parameters HW (CS, gamma=0) from calibration (task 5) (%s): a = %.8f, sigma (b) = %.8f\n\n', ...
         yearLabel, hw.a, hw.sigma);
 
-    for i = 1:numel(frequencies)
-        freq = frequencies{i};
-        for j = 1:numel(cdsSpreads)
-            cds = cdsSpreads(j);
+    [NPV_vec, CVA_vec, final_vec] = arrayfun(@(cds) ...
+        price_amortizing_swap_cva_hw(hw, ...
+            swapData, OISBoots{y}, EURBoots{y}, settlementDates(y), fixedRate, ...
+            isPayer, fixingFrequency, cds, LGD, knownFixingOpt), cdsSpreads);
 
-            if isempty(knownFixingOpt)
-                [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw, ...
-                    swapData, OISBoots{y}, EURBoots{y}, settlementDates(y), fixedRate, ...
-                    isPayer, freq, cds, LGD);
-            else
-                [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw, ...
-                    swapData, OISBoots{y}, EURBoots{y}, settlementDates(y), fixedRate, ...
-                    isPayer, freq, cds, LGD, knownFixingOpt);
-            end
-
-            fprintf("Freq: %-10s | CDS: %3d bps | NPV_riskfree: %10.2f EUR | CVA: %10.2f EUR | Final NPV: %10.2f EUR\n", ...
-                freq, round(cds*10000), NPV_riskfree, CVA, final_price);
-        end
+    for j = 1:numel(cdsSpreads)
+        fprintf("Freq: %-10s | CDS: %3d bps | NPV_riskfree: %10.2f EUR | CVA: %10.2f EUR | Final NPV: %10.2f EUR\n", ...
+            fixingFrequency, round(cdsSpreads(j)*10000), NPV_vec(j), CVA_vec(j), final_vec(j));
     end
 end
 
