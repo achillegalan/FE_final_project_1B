@@ -2,7 +2,7 @@ function volsData = loadSwaptionVols()
 % LOADSWAPTIONVOLS Loads the Bachelier swaption volatility cube for the project.
 
     % Define the coordinate axis metadata (Expiries and Tenors in years)
-    settlementDate = datetime(2022, 6, 28); % add_target_business_days(tradeDate, 2)
+    settlementDate = datetime(2022, 6, 26); % add_target_business_days(tradeDate, 2)
     
     % Define the target months corresponding to each matrix row grid point
     expiryMonths = [1, 3, 6, 9, 12, 24, 36, 48, 60, 72, 84, 96, 108, 120, 144, 180, 240, 300, 360];

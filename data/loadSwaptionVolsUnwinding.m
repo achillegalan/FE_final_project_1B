@@ -4,7 +4,7 @@ function volsData = loadSwaptionVolsUnwinding()
 %   Source Data: Bloomberg / ICAP dataset 
 
     % Define the coordinate axis metadata (Expiries and Tenors in years) 
-    settlementDate = datetime(2023, 2, 2); % add_target_business_days(tradeDate, 2)
+    settlementDate = datetime(2023, 1, 31); % add_target_business_days(tradeDate, 2)
     
     % Define the target months corresponding to each matrix row grid point
     expiryMonths = [1, 3, 6, 9, 12, 24, 36, 48, 60, 72, 84, 96, 108, 120, 144, 180, 240, 300, 360];
