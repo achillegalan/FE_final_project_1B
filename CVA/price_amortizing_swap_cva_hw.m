@@ -3,9 +3,36 @@ function [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw,...
      isPayer, fixingFrequency, cdsSpreads, LGD, knownFixing)
 % PRICE_AMORTIZING_SWAP_CVA_HW Prices an amortizing swap and its CVA using a 
 % Hull-White Trinomial Tree under the Multi-Curve framework (gamma = 0).
+%
+% INPUTS:
+%   hw              - Struct with Hull-White parameters 'a' (mean reversion) 
+%                     and 'sigma' (volatility).
+%   swapData        - Table or struct containing the swap schedule. Required 
+%                     fields: PayDate, AccrualStart, AccrualEnd, Notional.
+%   OIS_curve       - Struct containing the OIS discount curve. Required fields:
+%                     settlementDate, dates, zeroRates.
+%   EUR3M_curve     - Struct containing the Euribor 3M pseudo-discount curve. 
+%                     Required fields: dates, zeroRates.
+%   settlementDate  - Valuation date (datetime object).
+%   strike          - Fixed swap rate (K).
+%   isPayer         - Logical flag: true for Payer swap, false for Receiver.
+%   fixingFrequency - String specifying the floating reset frequency: 
+%                     'quarterly' or 'semiannual'.
+%   cdsSpreads      - CDS spread in decimal form (e.g., 300 bps = 0.03).
+%   LGD             - Loss Given Default parameter (e.g., 40% = 0.40).
+%   knownFixing     - (Optional) Struct with already observed fixings. Required 
+%                     fields: fixingDate, resetRate. Defaults to empty/unfixed.
+%
+% OUTPUTS:
+%   NPV_riskfree    - Net Present Value of the amortizing swap assuming no 
+%                     counterparty credit risk (evaluated at the root node).
+%   CVA             - Credit Value Adjustment calculated by integrating the 
+%                     interpolated tree EPE with CDS-bootstrapped survival 
+%                     probabilities.
+%   final_price     - The credit-adjusted swap value (NPV_riskfree - CVA).
 
     % ---------------------------------------------------------------------
-    % 1. EXTRACT & FILTER SWAP DATA
+    % EXTRACT & FILTER SWAP DATA
     % ---------------------------------------------------------------------
     allPayDates = swapData.PayDate;
     allAccStarts = swapData.AccrualStart;
@@ -19,7 +46,7 @@ function [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw,...
     end
     
     % ---------------------------------------------------------------------
-    % 2. TIME GRID SETUP
+    % TIME GRID SETUP
     % ---------------------------------------------------------------------
     dt = 1/24; 
     T_max = yearfrac(settlementDate, max(allPayDates(idx_future)), 3);
@@ -27,7 +54,7 @@ function [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw,...
     time_grid = (0:N)' * dt;
     
     % ---------------------------------------------------------------------
-    % 3. TREE GEOMETRY
+    % TREE GEOMETRY
     % ---------------------------------------------------------------------
     a = hw.a;
     tol = 1e-6;
@@ -80,7 +107,6 @@ function [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw,...
         end
     end
     
-    % Added the zeta_hw convexity correction term
     if a == 0
         B_hw = @(t, T) (T - t);
         phi_hw = @(t) sigma^2 * t;
@@ -92,7 +118,7 @@ function [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw,...
     end
 
     % ---------------------------------------------------------------------
-    % 4. FORWARD INDUCTION (ARROW-DEBREU STATE PRICES)
+    % FORWARD INDUCTION (ARROW-DEBREU STATE PRICES)
     % ---------------------------------------------------------------------
     AD = zeros(num_nodes, N+1);
     mid_idx = j_max + 1;
@@ -107,10 +133,9 @@ function [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw,...
         
         B_step = B_hw(t_curr, t_next);
         phi_curr = phi_hw(t_curr);
-        zeta_curr = zeta_hw(t_curr); % Fetch Zeta
+        zeta_curr = zeta_hw(t_curr); 
         
         discount_det = P_OIS_grid(n+1) / P_OIS_grid(n); 
-        % Added - B_step * zeta_curr
         discount_stoch = exp(-B_step * x_space - 0.5 * B_step^2 * phi_curr - B_step * zeta_curr);
         discount_node_fwd = discount_det .* discount_stoch;
 
@@ -125,7 +150,7 @@ function [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw,...
     end
     
     % ---------------------------------------------------------------------
-    % 5. MAP CASH FLOWS TO TREE
+    % MAP CASH FLOWS TO TREE
     % ---------------------------------------------------------------------
     CF_list = struct('is_det', {}, 'amount', {}, 'pay_step', {}, 'reset_step', {}, ...
                      'N', {}, 'delta', {}, 'delta_fixing', {}, 'reset_time_frac', {}, ...
@@ -204,7 +229,7 @@ function [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw,...
     end
     
     % ---------------------------------------------------------------------
-    % 6. BACKWARD INDUCTION (NPV & EPE)
+    % BACKWARD INDUCTION (NPV & EPE)
     % ---------------------------------------------------------------------
     V = zeros(num_nodes, 1);
     EPE = zeros(N+1, 1);
@@ -217,11 +242,11 @@ function [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw,...
             
             B_step = B_hw(t_curr, t_next);
             phi_curr = phi_hw(t_curr);
-            zeta_curr = zeta_hw(t_curr); % Fetch Zeta
+            zeta_curr = zeta_hw(t_curr); 
             
             discount_det = P_OIS_grid(n+1) / P_OIS_grid(n); 
             
-            % Added - B_step * zeta_curr
+            
             discount_stoch = exp(-B_step * x_space - 0.5 * B_step^2 * phi_curr - B_step * zeta_curr);
             discount_node = discount_det .* discount_stoch;
             
@@ -237,7 +262,7 @@ function [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw,...
                 B_term2 = B_hw(t1, t2);
                 B_term_pay = B_hw(t1, CF_list(c).pay_time_frac);
                 phi_t1 = phi_hw(t1);
-                zeta_t1 = zeta_hw(t1); % Fetch Zeta
+                zeta_t1 = zeta_hw(t1); 
                 
                 date1 = CF_list(c).exact_date_reset;
                 date2 = CF_list(c).exact_date_end;
@@ -249,7 +274,6 @@ function [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw,...
                 P_EUR_0_t1  = getTargetDF(settlementDate, EUR3M_curve.dates, EUR3M_curve.zeroRates, date1);
                 P_EUR_0_t2  = getTargetDF(settlementDate, EUR3M_curve.dates, EUR3M_curve.zeroRates, date2);
                 
-                % CORRECTED: Added - B_term * zeta_t1 to analytical bond formulas
                 P_OIS_node_pay = (P_OIS_0_pay / P_OIS_0_t1) .* exp(-B_term_pay * x_space - 0.5 * B_term_pay^2 * phi_t1 - B_term_pay * zeta_t1); 
                 P_EUR_node_t2 = (P_EUR_0_t2 / P_EUR_0_t1) * exp(-B_term2 * x_space - 0.5 * B_term2^2 * phi_t1 - B_term2 * zeta_t1);
                 
@@ -280,7 +304,7 @@ function [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw,...
     NPV_riskfree = V(mid_idx);
     
     % =========================================================================
-    % 6.5 POST-PROCESSING: THE EXPOSURE INTERPOLATION HEURISTIC
+    % POST-PROCESSING: THE EXPOSURE INTERPOLATION HEURISTIC
     % =========================================================================
     EPE_patched = EPE; 
     all_pay_steps = unique([CF_list.pay_step]);
@@ -314,7 +338,7 @@ function [NPV_riskfree, CVA, final_price] = price_amortizing_swap_cva_hw(hw,...
     EPE = EPE_patched;
 
     % ---------------------------------------------------------------------
-    % 7. CVA INTEGRATION
+    % CVA INTEGRATION
     % ---------------------------------------------------------------------
     futurePayDates = allPayDates(idx_future);
     survProbs = bootstrapSurvivalProbabilities(OIS_curve, futurePayDates, cdsSpreads, LGD);

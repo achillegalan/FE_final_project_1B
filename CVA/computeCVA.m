@@ -44,7 +44,7 @@ fullAccStart   = swapData.AccrualStart(:);
 fullAccEnd     = swapData.AccrualEnd(:);
 fullNotional   = swapData.Notional(:);
 
-%% 0) Build reset periods correctly on the FULL schedule
+%% Build reset periods correctly on the full schedule
 fullCalcStart = fullAccStart;
 fullCalcEnd   = fullAccEnd;
 fixingFrequency = lower(string(strtrim(fixingFrequency)));
@@ -84,7 +84,7 @@ if numPeriods == 0
     return;
 end
 
-%% 1) Survival probabilities
+%% Survival probabilities
 switch Mode
     case {"BOOTSTRAP", "BOOSTRAP"}
         survProbs = bootstrapSurvivalProbabilities(OIS_curve, futurePayDates, cdsSpreads, LGD);
@@ -103,7 +103,7 @@ survProbs = survProbs(:);
 survProbsFull = [1; survProbs];
 CVAsurvProbs = survProbsFull(1:end-1) - survProbsFull(2:end);
 
-%% 2) Pre-calculate the effective index rate (L) for every future period
+%% Pre-calculate the effective index rate (L) for every future period
 knownDates = NaT(0,1);
 knownRates = [];
 
@@ -128,7 +128,7 @@ if ~isempty(knownDates) && any(isFixedAtValuation)
     L_effective(validOverride) = knownRates(idxKnown(validOverride));
 end
 
-%% 3) Unified Stochastic exposures via Swaptions (Volatility Scaling)
+%% Unified Stochastic exposures via Swaptions (Volatility Scaling)
 EPE_total = zeros(max(numPeriods - 1, 0), 1);
 EPE_det = zeros(max(numPeriods - 1, 0), 1);
 deltaFracs = yearfrac(futureAccStart, futureAccEnd, 2); % ACT/360
@@ -238,7 +238,7 @@ for i = 1:(numPeriods - 1)
 end
 
 
-%% 4) Final CVA
+%% Final CVA
 probWeights = CVAsurvProbs(1:end-1);
 CVA = LGD * sum(probWeights .* EPE_total);
 CVA_det =  LGD * sum(probWeights .* EPE_det);

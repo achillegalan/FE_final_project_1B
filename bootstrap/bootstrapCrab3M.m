@@ -36,7 +36,7 @@ function curve = bootstrapCrab3M(mkt, oisCurve, settlementDate, flag)
     curveDisc = 1.0;
     allCalcDates = settlementDate;
 
-    %% 1. Deposit 3M 
+    %% Deposit 3M 
     depIdx = find(terms == "3 MO", 1);
 
     depRate = rates(depIdx);
@@ -48,7 +48,7 @@ function curve = bootstrapCrab3M(mkt, oisCurve, settlementDate, flag)
     curveDisc(end+1,1) = depDisc;
     allCalcDates(end+1,1) = depEnd;
 
-    %% 2. Futures treated as FRA (no convexity adjustment)
+    %% Futures treated as FRA (no convexity adjustment)
     % find the futures dates and sort them in cronological order
     futIdx = find(startsWith(terms, "ER"));
     nFut = numel(futIdx);
@@ -90,7 +90,7 @@ function curve = bootstrapCrab3M(mkt, oisCurve, settlementDate, flag)
     [curveDates, uniqueIdx] = unique(curveDates, 'stable');
     curveDisc = curveDisc(uniqueIdx);
 
-   %% 3. Swaps (sequential bootstrap; vectorized preprocessing only)
+   %% Swaps (sequential bootstrap; vectorized preprocessing only)
     swapIdx = find(endsWith(terms, "YR"));
 
     % Vectorized extraction of swap terms and rates
