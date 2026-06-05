@@ -3,7 +3,6 @@
 % Achille Galante, Salvatore Ippolito, Ginevra Angelica Marelli
 clc
 clear all
-tic
 ActiveFolders()
 
 %% LOADING DATASET
@@ -39,6 +38,7 @@ EUR3M_Boot_2 = bootstrapCrab3M(EUR3M_Curve_2, OIS_Boot_2, settlementDate_2, true
 fprintf('\n========= Task 2: NPV risk-free 2022 =========\n')
 knownFixing_2022 = struct('fixingDate', datetime(2022,06,24), 'resetRate', -0.00218);
 fixedRate = 0.0221;
+
 swap_quarterly = AmmortizedSwapPricer( ...
     swapData, OIS_Boot, EUR3M_Boot, settlementDate, fixedRate, 'quarterly', knownFixing_2022);
 swap_semiannual = AmmortizedSwapPricer( ...
@@ -56,7 +56,6 @@ normalVol = loadSwaptionVols();
 isPayer = true; 
 fixingFrequency = 'quarterly';
 LGD = 0.40;
-
 cdsSpreads = [300 500]/1e4;
 
 hazardModes = ["BOOTSTRAP", "CONSTANT LAMBDA"];
@@ -68,16 +67,15 @@ hazardModes = ["BOOTSTRAP", "CONSTANT LAMBDA"];
 
 %% TASK 4: CVA 2023
 fprintf('\n\n========= Task 4: CVA Computation 2023 =========\n')
-
 knownFixing_2023 = struct('fixingDate', datetime(2022,12,23), 'resetRate', 0.02141);
+normalVol_2 = loadSwaptionVolsUnwinding();
 
 % MtM risk-free quarterly
 swapUnwindPrice = AmmortizedSwapPricer( ...
     swapData, OIS_Boot_2, EUR3M_Boot_2, settlementDate_2, fixedRate, ...
     fixingFrequency, knownFixing_2023);
 
-normalVol_2 = loadSwaptionVolsUnwinding();
-
+% CVA
 [CVA_2023, CVA_det_2023, CVA_stoch_2023, NPV_2023] = runCVASection( ...
     swapData, OIS_Boot_2, EUR3M_Boot_2, settlementDate_2, fixedRate, normalVol_2, ...
     isPayer, fixingFrequency, cdsSpreads, LGD, knownFixing_2023, ...
@@ -103,12 +101,13 @@ for y = 1:numel(yearLabels)
     diagMkt{y} = buildDiagonalSwaptionMarketData( ...
         OISBoots{y}, EURBoots{y}, diagSwaptions{y}, isPayer, isCS);
 end
+%%
         % %% 1. OBJECTIVE LANDSCAPE PLOT (only gamma = 0, year = 2022)
         % aVec = linspace(0.0001, 0.4, 30);
         % bVec = linspace(0.0020, 0.4, 30);
-        % 
+        % gamma_try = 0;
         % [~, ~, ~, minPoint] = plotMHWabObjectiveLandscape( ...
-        %    OISBoots{1}, EURBoots{1}, diagMkt{1}, 0, isPayer, aVec, bVec, isCS);
+        %    OISBoots{1}, EURBoots{1}, diagMkt{1}, gamma_try, isPayer, aVec, bVec, isCS);
         % 
         % % 2. HYBRID CALIBRATION (all 6 cases: 3 gammas x 2 years)
         % rng(1234);
@@ -167,5 +166,3 @@ for y = 1:numel(yearLabels)
             fixingFrequency, round(cdsSpreads(j)*10000), NPV_vec(j), CVA_vec(j), final_vec(j));
     end
 end
-
-toc

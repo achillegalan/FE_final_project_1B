@@ -104,7 +104,6 @@ survProbsFull = [1; survProbs];
 CVAsurvProbs = survProbsFull(1:end-1) - survProbsFull(2:end);
 
 %% 2) Pre-calculate the effective index rate (L) for every future period
-L_effective = zeros(numPeriods, 1);
 knownDates = NaT(0,1);
 knownRates = [];
 
@@ -113,20 +112,20 @@ if isstruct(knownFixing) && isfield(knownFixing, 'fixingDate') && isfield(knownF
     knownRates = knownFixing.resetRate(:);
 end
 
-for k = 1:numPeriods
-    % Forward rate via pseudo-discount curve
-    Pstart = getTargetDF(settlementDate, EUR3M_curve.dates, EUR3M_curve.zeroRates, calcStart(k));
-    Pend   = getTargetDF(settlementDate, EUR3M_curve.dates, EUR3M_curve.zeroRates, calcEnd(k));
-    deltaReset = yearfrac(calcStart(k), calcEnd(k), 2); % ACT/360
-    L_effective(k) = (Pstart / Pend - 1) / deltaReset;
-    
-    % Override with known fixing if already fixed
-    if isFixedAtValuation(k)
-        idxKnown = find(knownDates == fixingDates(k), 1);
-        if ~isempty(idxKnown) && ~isnan(knownRates(idxKnown))
-            L_effective(k) = knownRates(idxKnown);
-        end
-    end
+Pstart = getTargetDF(settlementDate, EUR3M_curve.dates, EUR3M_curve.zeroRates, calcStart);
+Pend   = getTargetDF(settlementDate, EUR3M_curve.dates, EUR3M_curve.zeroRates, calcEnd);
+deltaReset = yearfrac(calcStart, calcEnd, 2); % ACT/360
+
+L_effective = (Pstart ./ Pend - 1) ./ deltaReset;
+
+if ~isempty(knownDates) && any(isFixedAtValuation)
+    [hasKnownFixing, idxKnown] = ismember(fixingDates, knownDates);
+
+    overrideMask = isFixedAtValuation & hasKnownFixing;
+    validOverride = overrideMask;
+    validOverride(overrideMask) = ~isnan(knownRates(idxKnown(overrideMask)));
+
+    L_effective(validOverride) = knownRates(idxKnown(validOverride));
 end
 
 %% 3) Unified Stochastic exposures via Swaptions (Volatility Scaling)
@@ -158,6 +157,20 @@ for i = 1:(numPeriods - 1)
     fwdDiscounts = payDiscounts ./ optionDiscount;
     ammNotional  = remNotional ./ remNotional(1);
     
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    if any(remFixed)
+        detUnitValue = sum( ...
+            remDelta(remFixed) .* ammNotional(remFixed) .* fwdDiscounts(remFixed) .* ...
+            (remL(remFixed) - strike) );
+
+        if ~isPayer
+            detUnitValue = -detUnitValue;
+        end
+
+        EPE_det(i) = optionDiscount * remNotional(1) * max(detUnitValue, 0);
+    end
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        
     % Combine BOTH deterministic and stochastic flows for Forward Rate
     BPV_total = sum(remDelta .* ammNotional .* fwdDiscounts);
     FloatNPV  = sum(remDelta .* ammNotional .* fwdDiscounts .* remL);
@@ -188,10 +201,7 @@ for i = 1:(numPeriods - 1)
     numTenors = length(tenorsList);
     maxTenor = max(tenorsList);
     
-    vanillaPaymentDates = NaT(maxTenor, 1);
-    for y = 1:maxTenor
-        vanillaPaymentDates(y) = add_target_months(exerciseDate, 12 * y, 'modifiedfollow');
-    end
+    vanillaPaymentDates = add_target_months(exerciseDate, 12 * (1:maxTenor)', 'modifiedfollow');
     
     vanillaAccrualStarts = [exerciseDate; vanillaPaymentDates(1:end-1)];
     vanillaYearFracs = yearfrac(vanillaAccrualStarts, vanillaPaymentDates, 2);
@@ -225,13 +235,16 @@ for i = 1:(numPeriods - 1)
     end
     
     EPE_total(i) = optionDiscount * BPV_total * unitPrice * remNotional(1);
+    %%%%%%%%%%%%
+    EPE_det = zeros(max(numPeriods - 1, 0), 1);
+    %%%%%%%%%%%%
 end
 
 
 %% 4) Final CVA
 probWeights = CVAsurvProbs(1:end-1);
-CVA       = LGD * sum(probWeights .* EPE_total);
-CVA_det   = 0;
-CVA_stoch = CVA;
+CVA = LGD * sum(probWeights .* EPE_total);
+CVA_det =  LGD * sum(probWeights .* EPE_det);
+CVA_stoch = CVA - CVA_det;
 
 end
