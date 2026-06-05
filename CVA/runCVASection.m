@@ -51,7 +51,7 @@ end
 
 
 %% Print of the table
-fprintf('\nQuarterly MtM (risk-free): %.2f EUR\n', swapRiskFree);
+fprintf('\n%s MtM (risk-free): %.2f EUR\n', char(fixingFrequency), swapRiskFree);
 
 for m = 1:nModes
     fprintf('\n --- HAZARD-RATE METHOD: %s ---\n', hazardModes(m));

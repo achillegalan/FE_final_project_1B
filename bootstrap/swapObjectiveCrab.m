@@ -29,22 +29,18 @@ function value = swapObjectiveCrab(PN, settlementDate, maturityDate, ...
     tmpDisc  = [knownDisc; PN];
 
     %% Floating leg
-    floatingLeg = 0;
+    tau = yearfrac(settlementDate, tmpDates, 3);
+    zeroRates = nan(size(tmpDisc));
 
-    for j = 1:numel(floatEnd)
-        Tstart = floatStart(j);
-        Tend   = floatEnd(j);
-        delta = floatDelta(j);
-        Pstart = get_discount_factor_by_zero_rates_linear_interp( ...
-            settlementDate, Tstart, tmpDates, tmpDisc);
-        Pend   = get_discount_factor_by_zero_rates_linear_interp( ...
-            settlementDate, Tend, tmpDates, tmpDisc);
-        
-        forward3M = (Pstart / Pend - 1) / delta;
-        oisDiscEnd = oisDiscFloatEnd(j);
+    isAfterSettlement = tau > 0;
+    zeroRates(isAfterSettlement) = ...
+        -log(tmpDisc(isAfterSettlement)) ./ tau(isAfterSettlement);
 
-        floatingLeg = floatingLeg + delta * forward3M * oisDiscEnd;
-    end
+    Pstart = getTargetDF(settlementDate, tmpDates, zeroRates, floatStart(:));
+    Pend   = getTargetDF(settlementDate, tmpDates, zeroRates, floatEnd(:));
+
+    forward3M = (Pstart ./ Pend - 1) ./ floatDelta(:);
+    floatingLeg = sum(floatDelta(:) .* forward3M .* oisDiscFloatEnd(:));
 
     %% total
     value = floatingLeg - fixedLeg;

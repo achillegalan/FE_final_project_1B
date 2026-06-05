@@ -57,9 +57,15 @@ for i = 1:n_knots
     % Initial DF guess based on flat extrapolation from previous node.
     guess_df = prev_df * exp(-sortedRates(i) * (curr_t - prev_t));
     
+    % Precompute quantities that do not depend on the trial curr_df.
+    payTargetT = yearfrac(settlementDate, pay_dates(2:end), 3);      % ACT/365
+    payDelta   = yearfrac(pay_dates(1:end-1), pay_dates(2:end), 2); % ACT/360
+
+    known_t = yearfrac(settlementDate, OIS_df_dates(1:i-1), 3);
+    known_r = -log(OIS_df(1:i-1)) ./ known_t;
     % Solve current DF so that swap residual = 0.
     objective = @(curr_df) swapResidualOIS(curr_df, curr_t, prev_t, prev_r, ...
-        settlementDate, pay_dates, OIS_df_dates, OIS_df, sortedRates(i), i);
+        payTargetT, payDelta, known_t, known_r, sortedRates(i));
     
     OIS_df(i) = fzero(objective, guess_df);
 end
@@ -80,53 +86,37 @@ OIS_Boot.marketRates = sortedRates;
 end
 
 %------------------------- Helper -----------------------------------------
-function res = swapResidualOIS(curr_df, curr_t, prev_t, prev_r, settlementDate, ...
-    pay_dates, OIS_df_dates, OIS_df, swapRate, i)
+function res = swapResidualOIS(curr_df, curr_t, prev_t, prev_r, ...
+    payTargetT, payDelta, known_t, known_r, swapRate)
 %SWAPRESIDUALOIS Residual of OIS par equation for one maturity.
 
 % Convert the unknown discount factor at current maturity into a
 % continuously-compounded zero rate (ACT/365 basis).
 curr_r = -log(curr_df) / curr_t;
 
-% BPV (annuity) of the fixed leg for this OIS maturity:
-% sum_k delta_k * DF(payment_k).
-BPV = 0;
+% Vectorized interpolation of zero rates at all fixed-leg payment dates.
+interp_r = zeros(size(payTargetT));
 
-for p = 2:numel(pay_dates)
+knownMask = payTargetT <= prev_t;
+trialMask = ~knownMask;
 
-    pay_date = pay_dates(p);
-    target_t = yearfrac(settlementDate, pay_date, 3); % ACT/365
-
-    if target_t <= prev_t
-        % Payment date is at or before the last known curve node:
-        % use interpolation from already-bootstrapped nodes only.
-
-        known_t = yearfrac(settlementDate, OIS_df_dates(1:i-1), 3);
-        known_r = -log(OIS_df(1:i-1)) ./ known_t;
-
-        interp_r = interp1(known_t, known_r, target_t, 'linear', 'extrap');
-
-    else
-        % Payment date falls between previous and current maturity:
-        % interpolate linearly between previous known zero rate and
-        % current trial zero rate implied by curr_df.
-
-        lambda = (target_t - prev_t) / (curr_t - prev_t);
-
-        interp_r = (1 - lambda) * prev_r + lambda * curr_r;
-    end
-
-    % Convert interpolated zero rate back to discount factor at pay_date.
-    df_pay = exp(-interp_r * target_t);
-
-    delta_k = yearfrac(pay_dates(p-1), pay_dates(p), 2); % ACT/360
-
-    % Accumulate fixed-leg annuity contribution.
-    BPV = BPV + delta_k * df_pay;
+if any(knownMask)
+    interp_r(knownMask) = interp1(known_t, known_r, ...
+        payTargetT(knownMask), 'linear', 'extrap');
 end
 
-% OIS par condition for root-finding:
-% fixed leg PV - floating leg PV = 0.
+if any(trialMask)
+    lambda = (payTargetT(trialMask) - prev_t) ./ (curr_t - prev_t);
+    interp_r(trialMask) = (1 - lambda) .* prev_r + lambda .* curr_r;
+end
+
+% Convert interpolated zero rates back to discount factors.
+df_pay = exp(-interp_r .* payTargetT);
+
+% Fixed-leg annuity.
+BPV = sum(payDelta .* df_pay);
+
+% OIS par condition.
 PV_fixed = swapRate * BPV;
 PV_float = 1 - curr_df;
 res = PV_fixed - PV_float;
