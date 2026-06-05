@@ -130,6 +130,7 @@ end
 
 %% 3) Unified Stochastic exposures via Swaptions (Volatility Scaling)
 EPE_total = zeros(max(numPeriods - 1, 0), 1);
+EPE_det = zeros(max(numPeriods - 1, 0), 1);
 deltaFracs = yearfrac(futureAccStart, futureAccEnd, 2); % ACT/360
 
 for i = 1:(numPeriods - 1)
@@ -234,7 +235,6 @@ for i = 1:(numPeriods - 1)
     end
     
     EPE_total(i) = optionDiscount * BPV_total * unitPrice * remNotional(1);
-    EPE_det = zeros(max(numPeriods - 1, 0), 1);
 end
 
 
