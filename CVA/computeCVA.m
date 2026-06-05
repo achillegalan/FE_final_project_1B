@@ -157,7 +157,7 @@ for i = 1:(numPeriods - 1)
     fwdDiscounts = payDiscounts ./ optionDiscount;
     ammNotional  = remNotional ./ remNotional(1);
     
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % Deterministic part
     if any(remFixed)
         detUnitValue = sum( ...
             remDelta(remFixed) .* ammNotional(remFixed) .* fwdDiscounts(remFixed) .* ...
@@ -169,7 +169,6 @@ for i = 1:(numPeriods - 1)
 
         EPE_det(i) = optionDiscount * remNotional(1) * max(detUnitValue, 0);
     end
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         
     % Combine BOTH deterministic and stochastic flows for Forward Rate
     BPV_total = sum(remDelta .* ammNotional .* fwdDiscounts);
@@ -235,9 +234,7 @@ for i = 1:(numPeriods - 1)
     end
     
     EPE_total(i) = optionDiscount * BPV_total * unitPrice * remNotional(1);
-    %%%%%%%%%%%%
     EPE_det = zeros(max(numPeriods - 1, 0), 1);
-    %%%%%%%%%%%%
 end
 
 
